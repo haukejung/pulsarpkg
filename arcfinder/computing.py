@@ -324,7 +324,8 @@ class Secondary(Dynamic):  # Secondary inherits the Dynamic class
         dynamic = dynamic - np.mean(dynamic)
         secondary = np.fft.fftn(dynamic)
         # secondary /= secondary.max()
-        secondary = 10. * np.log10(np.abs(np.fft.fftshift(secondary)) ** 2)  # in decibels?
+        secondary = np.abs(np.fft.fftshift(secondary))**2
+        secondary = 10. * np.log10(secondary/np.max(secondary))  # in decibels
         if normalize_frequency:
             mask = [1. if i < len(secondary[0]) / 4. or i > 3 * len(secondary[0]) / 4. else 0. for i in
                     range(len(secondary[0]))]
@@ -333,8 +334,17 @@ class Secondary(Dynamic):  # Secondary inherits the Dynamic class
             mask = [1. if i < len(secondary) / 4. else 0. for i in range(len(secondary))]
             secondary = arr_normalize_axis(secondary, 'x', mask)
         if subtract_secondary_background:
-            secondary_background = np.mean(secondary[:len(secondary) / 4][:len(secondary[0]) / 4])
-            secondary = secondary - secondary_background
+            #secondary_background = np.mean(secondary[:len(secondary) / 4][:len(secondary[0]) / 4])
+            #secondary = secondary - secondary_background
+            nbins = 25
+            histSec = np.histogram(secondary,bins=nbins)
+            binsize = (np.max(secondary)-np.min(secondary))//nbins
+            maxindex = np.where(histSec[0]==np.max(histSec[0])) #where frequency of occurences is highest
+            xVal = int(maxindex[0]) #position of peak in noise
+            xValDb = np.min(secondary)+binsize*xVal+3. #value of peak in noise offset up by 3Db
+            index = np.where(secondary<xValDb) 
+            if index!=-1: #if there are values less than threshold value
+                secondary[index] = xValDb
 
         ysize = secondary.shape[0]
         xsize = secondary.shape[1]
