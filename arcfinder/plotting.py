@@ -18,7 +18,7 @@ def show_image(showme, axis_y=None, axis_x=None):
     (x_min, x_max) = (min(axis_x), max(axis_x))
     (y_min, y_max) = (min(axis_y), max(axis_y))
     plt.figure()
-    plt.imshow(showme, aspect='auto', extent=[x_min, x_max, y_min, y_max])
+    plt.imshow(showme, aspect='auto', extent=[x_min, x_max, y_min, y_max],cmap='Greys')
     plt.colorbar()
     return
 

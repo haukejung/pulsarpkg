@@ -69,7 +69,7 @@ class Dynamic:
         self.dyn = self.get_dynamic_spectrum(data[0].data)
         self.dyni = Indexed2D(data=self.dyn, axes=self.get_dyn_axes())
 
-    def get_dynamic_spectrum(self, data, normalize_frequency=False, normalize_time=True, outliers_sigma=3):
+    def get_dynamic_spectrum(self, data, normalize_frequency=False, normalize_time=True, outliers_sigma=7):
         """
         returns a numpy array containing the dynamic spectrum.
         :param normalize_frequency: if set to True, then will normalize the dynamic spectrum
@@ -81,12 +81,22 @@ class Dynamic:
         """
         dynamic = data
         # dynamic = np.rot90(data)
-        dyn_mean = np.mean(dynamic)
-        dyn_std = np.std(dynamic)
-        for row in range(len(dynamic)):
-            for col in range(len(dynamic[row])):
-                if np.abs(dynamic[row][col] - dyn_mean) > float(outliers_sigma) * dyn_std:
-                    dynamic[row][col] = dyn_mean
+        # dyn_mean = np.mean(dynamic)
+        # dyn_std = np.std(dynamic)
+
+        # for row in range(len(dynamic)):
+        #     for col in range(len(dynamic[row])):
+        #         if np.abs(dynamic[row][col] - dyn_mean) > float(outliers_sigma) * dyn_std:
+        #             dynamic[row][col] = dyn_mean
+
+        dyn_median = np.mean(dynamic)
+        dyn_med_std = np.std(dynamic - dyn_median)
+
+        # sets values 9 SDs above the mean and values less than 0 to 0
+        index = np.where(np.logical_or(dynamic >= dyn_median + (float(outliers_sigma) * dyn_med_std), dynamic < 0.))
+        dynamic[index] = 0.
+
+
         if normalize_frequency:
             dynamic = arr_normalize_axis(dynamic, 'y')
         if normalize_time:
