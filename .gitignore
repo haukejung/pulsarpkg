@@ -1,0 +1,6 @@
+__pycache__/
+*.py[cod]
+*.fit
+*.fits
+*.sqlite
+.ipynb_checkpoints/

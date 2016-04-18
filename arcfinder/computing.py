@@ -344,16 +344,16 @@ class Secondary(Dynamic):  # Secondary inherits the Dynamic class
             mask = [1. if i < len(secondary) / 4. else 0. for i in range(len(secondary))]
             secondary = arr_normalize_axis(secondary, 'x', mask)
         if subtract_secondary_background:
-            #secondary_background = np.mean(secondary[:len(secondary) / 4][:len(secondary[0]) / 4])
-            #secondary = secondary - secondary_background
+            # secondary_background = np.mean(secondary[:len(secondary) / 4][:len(secondary[0]) / 4])
+            # secondary = secondary - secondary_background
             nbins = 25
-            histSec = np.histogram(secondary,bins=nbins)
+            histSec = np.histogram(secondary, bins=nbins)
             binsize = (np.max(secondary)-np.min(secondary))//nbins
-            maxindex = np.where(histSec[0]==np.max(histSec[0])) #where frequency of occurences is highest
-            xVal = int(maxindex[0]) #position of peak in noise
-            xValDb = np.min(secondary)+binsize*xVal+3. #value of peak in noise offset up by 3Db
+            maxindex = np.where(histSec[0] == np.max(histSec[0]))  # where frequency of occurences is highest
+            xVal = int(maxindex[0])  # position of peak in noise
+            xValDb = np.min(secondary)+binsize*xVal+3.  # value of peak in noise offset up by 3Db
             index = np.where(secondary<xValDb) 
-            if index!=-1: #if there are values less than threshold value
+            if index != -1:  # if there are values less than threshold value
                 secondary[index] = xValDb
 
         ysize = secondary.shape[0]
