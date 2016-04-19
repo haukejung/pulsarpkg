@@ -1,7 +1,6 @@
 import multiprocessing as mp
 from .multiprocessing_helper_functions import *
 from astropy.io import fits
-import matplotlib.pyplot as plt
 
 
 def sort_dict_by_key(dictionary):
@@ -41,9 +40,10 @@ def arr_normalize_axis(arr, axis=None, mask=None):
     elif axis is 'y':
         if mask is None:
             mask = [1.]*len(arr[0])
-        else:
-            for e in mask:
-                e = np.float(e)
+        # not used:
+        # else:
+        #     for e in mask:
+        #         e = np.float(e)
         mean = 0.
         for row in arr:
             mean += np.mean(mask * row)
@@ -69,9 +69,11 @@ class Dynamic:
         self.dyn = self.get_dynamic_spectrum(data[0].data)
         self.dyni = Indexed2D(data=self.dyn, axes=self.get_dyn_axes())
 
-    def get_dynamic_spectrum(self, data, normalize_frequency=False, normalize_time=True, outliers_sigma=7):
+    @staticmethod
+    def get_dynamic_spectrum(data, normalize_frequency=False, normalize_time=True, outliers_sigma=7):
         """
         returns a numpy array containing the dynamic spectrum.
+        :param data: plain numpy array
         :param normalize_frequency: if set to True, then will normalize the dynamic spectrum
                to compensate for uneven power in different frequency bins (horizontally stripey)
         :param normalize_time: if set to True, then will normalize the dynamic spectrum
@@ -95,7 +97,6 @@ class Dynamic:
         # sets values 9 SDs above the mean and values less than 0 to 0
         index = np.where(np.logical_or(dynamic >= dyn_median + (float(outliers_sigma) * dyn_med_std), dynamic < 0.))
         dynamic[index] = 0.
-
 
         if normalize_frequency:
             dynamic = arr_normalize_axis(dynamic, 'y')
@@ -317,7 +318,7 @@ class Secondary(Dynamic):  # Secondary inherits the Dynamic class
         return self.sec[value]
 
     def get_secondary_spectrum(self, subtract_secondary_background=True, normalize_frequency=True, normalize_time=True,
-                           cut_off_bottom=True, xscale=1., yscale=1.):
+                               cut_off_bottom=True, xscale=1., yscale=1.):
         """
         returns a secondary spectrum given a dynamic spectrum.
         :param subtract_secondary_background: whether or not to subtract the background

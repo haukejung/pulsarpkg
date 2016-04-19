@@ -30,13 +30,12 @@ def parse_args():
     query.add_argument('--pulsar', help='Full pulsar name')
     query.add_argument('--mjd', help='MJD-range in the form of "51000 52000"')
     query.add_argument('--freq', help='Frequency bandwidth (MHz) in the form of "300 400"')
-    query.add_argument('-a-', '--attr', help='other attribute, e.g. --attr "T_INT', nargs='*')
-    query.add_argument('-av', '--attr-value', help='value for the attribute or range in the form "x y"'
-                                                   ' (see --mjd)', nargs='*')
+    query.add_argument('-a', '--attr', help='other attribute, e.g. --attr "T_INT', nargs='+')
+    query.add_argument('-av', '--attr-value', help='attribute value or range (see --mjd)', nargs='+')
     query.add_argument('-d', '--dyn', action="store_true", help='Plot the dynamic spectrum')
     query.add_argument('-s', '--sec', action="store_true", help='Plot the secondary spectrum')
     # query.add_argument('-l', '--list', action="store_true", help='Only print a list of matching rows')
-    query.add_argument('--csv', help='Print a csv list')
+    query.add_argument('--csv', help='Write a csv file to CSV')
 
     parser.add_argument('database', help='filename of the database for reading and/or writing')
     parser.add_argument('-v', '--verbose', action="store_true", help='enable verbose mode')
@@ -52,7 +51,7 @@ def main(args):
     The main controller.
     :param args: arguments provided by the commandline
     """
-    db = sqlite.DB(args.database, args.verbose, args.debug)
+    db = sqlite.DB(args.database, args.debug, args.verbose)
     if args.subcmd == 'ingest':
         db.ingest_data(args.files)
     elif args.subcmd == 'sql':
@@ -68,15 +67,23 @@ def main(args):
             attr_dict["MJD"] = args.mjd
         if args.freq:
             attr_dict["FREQ"] = args.freq
-        rows = db.extract(attr_dict)
 
-        # for row in rows:
-        #     print(tuple(rows))
-        print("Found {0} matching rows\n".format(len(rows)))
-        # keys_dict = {'id': 5, 'filename': 30, 'ORIGIN': 10, 'MJD': 18, 'FREQ': 11, 'BW': 10}
         keys = ['id', 'filename', 'ORIGIN', 'MJD', 'FREQ', 'BW']
         widths = [4, 30, 23, 18, 12, 10]  # widths for the columns
-        if len(rows) > 0:
+
+        if args.attr and args.attr_value:
+            for a, v in zip(args.attr, args.attr_value):
+                attr_dict[a] = v
+                if a not in keys:
+                    keys.append(a)
+                    widths.append(10)  # std length for attributes supplied with -a is 10
+            rows = db.extract(attr_dict)
+
+        print("Found {0} matching rows\n".format(len(rows)))
+
+        if len(rows) < 1:
+            exit(0)  # nothing to do
+        else:
             text, text2 = '', ''
             for key, value in zip(keys, widths):
                 text += ' {0:{1}} |'.format(key, value)

@@ -246,9 +246,15 @@ class DB:
                     command += '`FREQ` >= ? AND `FREQ` <= ? AND '
                     values.extend(value.split(" "))
                 else:
-                    command += '`%s` ' % attribute
-                    command += 'LIKE ? AND '
-                    values.extend(['%'+value+'%'])
+                    split = value.split(" ")
+                    if len(split) == 2:
+                        command += '`{0}` >= ? AND `{1}` <= ? AND '.format(attribute, attribute)
+                        values.extend(value.split(" "))
+                    elif len(split) == 1:
+                        command += '{0} LIKE ? AND '.format(attribute)
+                        values.extend(['%'+value+'%'])
+                    else:
+                        raise ValueError("Didn't understand values for attribute {0}".format(attribute))
             command = command[:-4]  # remove the last "AND "
 
         if self.debug:
