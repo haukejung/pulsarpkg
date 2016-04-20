@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 from .multiprocessing_helper_functions import *
 from . import computing
 
+cmap = 'viridis'  # set default colormap
+
 
 def show_image(showme, axis_y=None, axis_x=None):
     """
@@ -9,6 +11,7 @@ def show_image(showme, axis_y=None, axis_x=None):
     :param showme: the 2D array to be shown
     :param axis_y: a 1D array containing the y axis to be used in the plot.
     :param axis_x: a 1D array containing the x axis to be used in the plot.
+    :param cmap: matplotlib colormap
     :return:
     """
     if axis_x is None:
@@ -18,7 +21,7 @@ def show_image(showme, axis_y=None, axis_x=None):
     (x_min, x_max) = (min(axis_x), max(axis_x))
     (y_min, y_max) = (min(axis_y), max(axis_y))
     plt.figure()
-    plt.imshow(showme, aspect='auto', extent=[x_min, x_max, y_min, y_max],cmap='Greys')
+    plt.imshow(showme, aspect='auto', extent=[x_min, x_max, y_min, y_max], cmap=cmap)
     plt.colorbar()
     return
 

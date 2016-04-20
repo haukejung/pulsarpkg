@@ -34,8 +34,8 @@ def parse_args():
     query.add_argument('-av', '--attr-value', help='attribute value or range (see --mjd)', nargs='+')
     query.add_argument('-d', '--dyn', action="store_true", help='Plot the dynamic spectrum')
     query.add_argument('-s', '--sec', action="store_true", help='Plot the secondary spectrum')
-    # query.add_argument('-l', '--list', action="store_true", help='Only print a list of matching rows')
     query.add_argument('--csv', help='Write a csv file to CSV')
+    query.add_argument('--cmap', help='Choose the colormap from the matplotlib palette, default is "viridis"')
 
     parser.add_argument('database', help='filename of the database for reading and/or writing')
     parser.add_argument('-v', '--verbose', action="store_true", help='enable verbose mode')
@@ -59,6 +59,10 @@ def main(args):
             print(tuple(row))
     elif args.subcmd == 'query':
         attr_dict = {}
+
+        if args.cmap:
+            plotting.cmap = args.cmap
+
         if args.filename:
             attr_dict["filename"] = args.filename
         if args.pulsar:
@@ -77,7 +81,7 @@ def main(args):
                 if a not in keys:
                     keys.append(a)
                     widths.append(10)  # std length for attributes supplied with -a is 10
-            rows = db.extract(attr_dict)
+        rows = db.extract(attr_dict)
 
         print("Found {0} matching rows\n".format(len(rows)))
 
