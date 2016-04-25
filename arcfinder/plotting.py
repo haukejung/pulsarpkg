@@ -1,8 +1,26 @@
 import matplotlib.pyplot as plt
 from .multiprocessing_helper_functions import *
 from . import computing
+from matplotlib.backends.backend_pdf import PdfPages
+
 
 cmap = 'viridis'  # set default colormap
+
+
+class Pdf:
+    def __init__(self, attr_dict):
+        self.pdfp = PdfPages('query.pdf')
+        self.info = self.pdfp.infodict()
+        self.info['Title'] = 'pulsarpkg'
+        self.info['Author'] = 'pulsarpkg'
+        for attr, value in attr_dict.items():
+            self.info[attr] = value
+
+    def save(self, fig):
+        self.pdfp.savefig(fig)
+
+    def __del__(self):
+        pass
 
 
 def show_image(showme, axis_y=None, axis_x=None):
@@ -20,37 +38,45 @@ def show_image(showme, axis_y=None, axis_x=None):
         axis_y = [i for i in range(len(showme))]
     (x_min, x_max) = (min(axis_x), max(axis_x))
     (y_min, y_max) = (min(axis_y), max(axis_y))
-    plt.figure()
+    fig = plt.figure()
     plt.imshow(showme, aspect='auto', extent=[x_min, x_max, y_min, y_max], cmap=cmap)
     plt.colorbar()
-    return
+    return fig
 
 
 def show():
     plt.show()
 
 
-def show_dyn(dyn_obj: computing.Dynamic):
-    show_image(dyn_obj.dyn, dyn_obj.get_y_axis(), dyn_obj.get_x_axis())
+def show_dyn(dyn_obj: computing.Dynamic, save=False, pdf: Pdf=None):
+    fig = show_image(dyn_obj.dyn, dyn_obj.get_y_axis(), dyn_obj.get_x_axis())
     plt.title(dyn_obj.db_header['filename'])
     plt.xlabel('Time (MJD - {0}) [s]'.format(dyn_obj.hdu_header['MJD']))
     plt.ylabel('Frequency [MHz]')
+    if save:
+        plt.savefig('{0}_dyn.pdf'.format(dyn_obj.db_header['filename']), format='pdf')
+    if pdf:
+        pdf.save(fig)
     return
 
 
-def show_sec(sec_obj: computing.Secondary):
+def show_sec(sec_obj: computing.Secondary, save=False, pdf=None):
     """
     plots the secondary spectrum to the current figure in matplotlib
     :param sec_obj: "Secondary" object
     :return:
     :return:
     """
-    show_image(sec_obj.get_sec(), sec_obj.get_y_axis(), sec_obj.get_x_axis())
+    fig = show_image(sec_obj.get_sec(), sec_obj.get_y_axis(), sec_obj.get_x_axis())
     if sec_obj.made_1D:
         overplot_parabolas(sec_obj, [min(sec_obj.etas), max(sec_obj.etas)])
     plt.title(sec_obj.observation_name)
     plt.ylabel('delay')
     plt.xlabel('fringe frequency')
+    if save:
+        plt.savefig('{0}_sec.pdf'.format(sec_obj.db_header['filename']), format='pdf')
+    if pdf:
+        pdf.save(fig)
     return
 
 

@@ -4,3 +4,6 @@ __pycache__/
 *.fits
 *.sqlite
 .ipynb_checkpoints/
+*.pdf
+.idea/
+
