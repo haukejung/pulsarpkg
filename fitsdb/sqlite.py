@@ -4,9 +4,9 @@ import glob
 import numpy as np
 
 
-class DB:
+class Files:
     """
-    FitsDB class for storing fits files in a sqlite database
+    Files class for accessing fits files directly
     """
     def import_fits(self):
         if not self.imported:
@@ -14,18 +14,76 @@ class DB:
             self.fits = fits
             self.imported = True
 
-    def __init__(self, name, debug=False, verbose=False):
-        assert isinstance(name, str)
-        self.name = name
+    def __init__(self, file, debug=False, verbose=False):
+        self.file = file[0]
         self.debug = debug
         self.imported = False
         self.fits = None
+        print(file)
+        self.files = self.get_file_list(file)
+
+    def get_file_list(self, search_list, debug=False, verbose=False):
+        """
+        Get the file list based on the search_list.
+        :param search_list: list of filenames, can include wildcards, e.g. dir/*.fits
+        :return: List of files
+        """
+        # self.import_fits()
+        self.import_fits()
+        file_list = []
+        for string in search_list:
+            for stri in glob.glob(string):
+                file_list.append(stri)
+        assert file_list != [], 'No files found.'
+        return file_list
+
+    def get_header_data(self, filename):
+        """
+        Get the header information and data of the provided file.
+        :param filename:
+        """
+        self.import_fits()
+        hdulist = self.fits.open(filename)
+        hdulist.verify('fix')
+        header = hdulist[0].header
+        astrodata = hdulist[0].data
+
+        header = self.fix_header(header)
+        hdulist[0].header = header
+        hdulist[0].data = astrodata
+        # hdulist.close()
+        return hdulist, header, astrodata
+
+    def fix_header(self, header):
+        """
+        Fix header fields: remove empty headers, set None where no familiar value is specified
+        :param header:
+        :return:
+        """
+        self.import_fits()
+        del(header[""])     # removing all empty headers
+        for key, value in header.items():
+            if isinstance(value, self.fits.card.Undefined):
+                header[key] = None
+                if self.debug:
+                    print('fixed', key)
+        # del(header[""])     # removing all empty headers
+        return header
+
+
+class DB(Files):
+    """
+    FitsDB class for storing fits files in a sqlite database
+    """
+    def __init__(self, file, debug=False, verbose=False):
+        assert isinstance(file, str)
+        Files.__init__(self, file, debug, verbose)
         self.fraction = 0
-        db = os.access(name, os.F_OK)
-        self.conn = sqlite3.connect(name, detect_types=sqlite3.PARSE_DECLTYPES)
+        db = os.access(file, os.F_OK)
+        self.conn = sqlite3.connect(self.file, detect_types=sqlite3.PARSE_DECLTYPES)
         self.conn.row_factory = sqlite3.Row  # makes the results of querys a dict instead of a tuple
         self.cursor = self.conn.cursor()
-        if os.path.isfile(name):
+        if os.path.isfile(self.file):
             if not db:
                 self.create_table()
 
@@ -86,37 +144,6 @@ class DB:
         res = self.cursor.fetchall()
         return res
 
-    def get_file_list(self, search_string):
-        """
-        Get the file list based on the search string.
-        :param search_string: string of filenames, can include wildcards, e.g. dir/*.fits
-        :return: List of files
-        """
-        # self.import_fits()
-        self.import_fits()
-        file_list = []
-        search_string = search_string.split()
-        for string in search_string:
-            # search_string = os.path.abspath(string)
-            for stri in glob.glob(string):
-                file_list.append(stri)
-        assert file_list != [], 'No files found.'
-        return file_list
-
-    def get_header_data(self, filename):
-        """
-        Get the header information and data of the provided file.
-        :param filename:
-        """
-        self.import_fits()
-        hdulist = self.fits.open(filename)
-        hdulist.verify('fix')
-        header = hdulist[0].header
-        astrodata = hdulist[0].data
-        hdulist.close()
-        header = self.fix_header(header)
-        return header, astrodata
-
     def get_columns(self):
         """
         Get a list of columns from the headers table
@@ -144,35 +171,19 @@ class DB:
     def report_percentage(self):
         return round(self.fraction*100)
 
-    def fix_header(self, header):
-        """
-        Fix header fields: remove empty headers, set None where no familiar value is specified
-        :param header:
-        :return:
-        """
-        self.import_fits()
-        del(header[""])     # removing all empty headers
-        for key, value in header.items():
-            if isinstance(value, self.fits.card.Undefined):
-                header[key] = None
-                if self.debug:
-                    print('fixed', key)
-        # del(header[""])     # removing all empty headers
-        return header
-
-    def ingest_data(self, search_string):
+    def ingest_data(self, search_list):
         """
         Ingest the header information and data with an UPDATE or INSERT.
-        :param search_string:
+        :param search_list:
         """
         self.import_fits()
-        files = self.get_file_list(search_string)
+        files = self.get_file_list(search_list)
         if self.debug:
             print(files)
         self.fraction = 0
         for file in files:
             header_id = self.get_id(file)     # will be None if file is not found in the DB
-            header, astrodata = self.get_header_data(file)
+            hdulist, header, astrodata = self.get_header_data(file)
             # del(header[""])     # removing all empty headers
             # print('header', header)
             self.check_columns(header.keys())

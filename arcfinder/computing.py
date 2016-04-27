@@ -59,13 +59,14 @@ def arr_normalize_axis(arr, axis=None, mask=None):
 
 
 class Dynamic:
-    def __init__(self, data: fits.HDUList, db_header: dict):
+    def __init__(self, data: fits.HDUList, db_header: dict, filename=None):
         """
         Initialize the dynamic spectrum class with a header and the corresponding dynamic spectrum
         :param data:
         """
         self.hdu_header = data[0].header
         self.db_header = db_header
+        self.filename = filename if filename else self.db_header['filename']
         self.dyn = self.get_dynamic_spectrum(data[0].data)
         self.dyni = Indexed2D(data=self.dyn, axes=self.get_dyn_axes())
 
@@ -291,7 +292,7 @@ class Indexed2D:
 
 # this class constructs, contains, and displays secondary spectra.
 class Secondary(Dynamic):  # Secondary inherits the Dynamic class
-    def __init__(self, data: fits.HDUList, db_header: dict, hand=None):
+    def __init__(self, data: fits.HDUList, db_header: dict, filename=None, hand=None):
         """
         initialize me with an dynamic object
         :param data:

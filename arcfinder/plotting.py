@@ -20,7 +20,7 @@ class Pdf:
         self.pdfp.savefig(fig)
 
     def __del__(self):
-        pass
+        self.pdfp.close()
 
 
 def show_image(showme, axis_y=None, axis_x=None):
@@ -50,13 +50,14 @@ def show():
 
 def show_dyn(dyn_obj: computing.Dynamic, save=False, pdf: Pdf=None):
     fig = show_image(dyn_obj.dyn, dyn_obj.get_y_axis(), dyn_obj.get_x_axis())
-    plt.title(dyn_obj.db_header['filename'])
+    plt.title(dyn_obj.filename)
     plt.xlabel('Time (MJD - {0}) [s]'.format(dyn_obj.hdu_header['MJD']))
     plt.ylabel('Frequency [MHz]')
     if save:
-        plt.savefig('{0}_dyn.pdf'.format(dyn_obj.db_header['filename']), format='pdf')
+        plt.savefig('{0}_dyn.pdf'.format(dyn_obj.filename), format='pdf')
     if pdf:
         pdf.save(fig)
+    plt.close()
     return
 
 
@@ -74,7 +75,7 @@ def show_sec(sec_obj: computing.Secondary, save=False, pdf=None):
     plt.ylabel('delay')
     plt.xlabel('fringe frequency')
     if save:
-        plt.savefig('{0}_sec.pdf'.format(sec_obj.db_header['filename']), format='pdf')
+        plt.savefig('{0}_sec.pdf'.format(sec_obj.filename), format='pdf')
     if pdf:
         pdf.save(fig)
     return

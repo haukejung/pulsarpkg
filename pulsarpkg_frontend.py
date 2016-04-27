@@ -92,9 +92,7 @@ def main(args):
         print(str(args.file[0]))
         db = sqlite.DB(str(args.file[0]), args.debug, args.verbose)
     elif args.f:
-        exit(0)  # don't do anything for now, not implemented
-    else:
-        pass
+        files = sqlite.Files(args.file, args.debug, args.verbose)
     if args.subcmd == 'ingest':
         db.ingest_data(args.files)
     elif args.subcmd == 'sql':
@@ -105,8 +103,9 @@ def main(args):
             plotting.cmap = args.cmap
 
         # outp = OrderedDict(id=4, filename=30, ORIGIN=23, MJD=18, FREQ=12, BW=10)
-        outp = OrderedDict()
-        outp['id'] = 4
+        outp = OrderedDict()  # consists of the output columns and their corresponding widths
+        if not args.f:
+            outp['id'] = 4
         outp['filename'] = 30
         outp['ORIGIN'] = 23
         outp['MJD'] = 18
@@ -114,17 +113,19 @@ def main(args):
         outp['BW'] = 10
 
         attr_dict = create_attr_dict(args, outp)
-        print(attr_dict)
+        if args.debug:
+            print('attr_dict', attr_dict)
 
         if args.db:
             result = db.extract(attr_dict)
         elif args.f:
-            result = []
+            result = files.files
+            print(result)
             pass
         else:
             result = []
-
-        print("Found {0} matching rows\n".format(len(result)))
+        type = 'rows' if args.db else 'files'
+        print("Found {0} matching {1}\n".format(len(result), type))
 
         if len(result) < 1:
             exit(0)  # nothing to do
@@ -143,39 +144,46 @@ def main(args):
                     csv += '{0};'.format(key)
             csv += '\n'
 
+        pdf = None
+        if args.pdf:
+            pdf = plotting.Pdf(attr_dict)
+
         for res in result:
-            hdulist = res[0]
-            db_header = res[1] if args.db else None
+            if args.db:
+                hdulist = res[0]
+                header = res[1]
+                filename = header['filename']
+            elif args.f:
+                hdulist, header, data = files.get_header_data(res)
+                filename = res
 
             # csv
             if args.csv:
                 if args.db:
-                    for key in db_header.keys():
+                    for key in header.keys():
                         if key != 'DATA':
-                            csv += '{0};'.format(db_header[key])
+                            csv += '{0};'.format(header[key])
                     csv += '\n'
-                else:
-                    header = hdulist[0].header
+                elif args.f:
                     for key in header.keys():
                         csv += '{0};'.format(header[key])
                     csv += '\n'
 
             # text output
             text = ''
+            if args.f:
+                text += ' {0:{1}} |'.format(filename, outp['filename'])
+                del(outp['filename'])  # delete, so it doesn't attempt to output it again in the next for-loop
             for key, value in outp.items():
-                text += ' {0:{1}} |'.format(db_header[key], value)
+                text += ' {0:{1}} |'.format(header[key], value)
             print(text[:-2])  # remove the last " |"
 
             # Plotting:
-            pdf = None
-            if args.pdf:
-                pdf = plotting.Pdf(attr_dict)
-            if args.dyn:
-                if not args.sec:  # only plot dynamic
-                    dyn = computing.Dynamic(hdulist, db_header)
-                    plotting.show_dyn(dyn, args.store, pdf)
+            if args.dyn and not args.sec:  # only plot dynamic
+                dyn = computing.Dynamic(hdulist, header, filename)
+                plotting.show_dyn(dyn, args.store, pdf)
             if args.sec:  # plot dynamic and secondary
-                sec = computing.Secondary(hdulist, db_header)
+                sec = computing.Secondary(hdulist, header, filename)
                 if args.dyn:
                     plotting.show_dyn(sec)
                 plotting.show_sec(sec, args.store, pdf)
