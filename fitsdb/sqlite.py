@@ -76,10 +76,11 @@ class DB(Files):
     FitsDB class for storing fits files in a sqlite database
     """
     def __init__(self, file, debug=False, verbose=False):
-        assert isinstance(file, str)
+        assert isinstance(file, list)
         Files.__init__(self, file, debug, verbose)
         self.fraction = 0
-        db = os.access(file, os.F_OK)
+        db = os.access(self.file, os.F_OK)
+        print('self.file', self.file)
         self.conn = sqlite3.connect(self.file, detect_types=sqlite3.PARSE_DECLTYPES)
         self.conn.row_factory = sqlite3.Row  # makes the results of querys a dict instead of a tuple
         self.cursor = self.conn.cursor()

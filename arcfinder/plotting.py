@@ -11,10 +11,16 @@ class Pdf:
     def __init__(self, attr_dict):
         self.pdfp = PdfPages('query.pdf')
         self.info = self.pdfp.infodict()
-        self.info['Title'] = 'pulsarpkg'
-        self.info['Author'] = 'pulsarpkg'
+        title = 'pulsarpkg result'
+        if len(attr_dict) > 0:
+            title += ' ('
         for attr, value in attr_dict.items():
-            self.info[attr] = value
+            title += '{0}: {1}, '.format(attr, value)
+        title = title[:-2]
+        if len(attr_dict) > 0:
+            title += ' )'
+        self.info['Title'] = title
+        self.info['Author'] = 'pulsarpkg'
 
     def save(self, fig):
         self.pdfp.savefig(fig)

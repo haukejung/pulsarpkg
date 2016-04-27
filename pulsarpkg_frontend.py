@@ -89,8 +89,7 @@ def main(args):
 
     db = None
     if args.db:
-        print(str(args.file[0]))
-        db = sqlite.DB(str(args.file[0]), args.debug, args.verbose)
+        db = sqlite.DB(args.file, args.debug, args.verbose)
     elif args.f:
         files = sqlite.Files(args.file, args.debug, args.verbose)
     if args.subcmd == 'ingest':
@@ -173,8 +172,9 @@ def main(args):
             text = ''
             if args.f:
                 text += ' {0:{1}} |'.format(filename, outp['filename'])
-                del(outp['filename'])  # delete, so it doesn't attempt to output it again in the next for-loop
             for key, value in outp.items():
+                if args.f and key == 'filename':
+                    continue
                 text += ' {0:{1}} |'.format(header[key], value)
             print(text[:-2])  # remove the last " |"
 
