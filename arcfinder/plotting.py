@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 from .multiprocessing_helper_functions import *
 from . import computing
 from matplotlib.backends.backend_pdf import PdfPages
+from time import strftime
 
 
 cmap = 'viridis'  # set default colormap
@@ -9,16 +10,20 @@ cmap = 'viridis'  # set default colormap
 
 class Pdf:
     def __init__(self, attr_dict):
-        self.pdfp = PdfPages('query.pdf')
-        self.info = self.pdfp.infodict()
-        title = 'pulsarpkg result'
+        title = 'pulsarpkg result'  # pdf title
+        name = 'pulsarpkg_query'  # filename
         if len(attr_dict) > 0:
             title += ' ('
         for attr, value in attr_dict.items():
             title += '{0}: {1}, '.format(attr, value)
+            name += '_{0}_{1}'.format(attr, value.replace(' ', '_'))
         title = title[:-2]
         if len(attr_dict) > 0:
             title += ' )'
+
+        self.pdfp = PdfPages(name+'_{0}.pdf'.format(strftime("%Y-%m-%d_%H-%M-%S")))
+        self.info = self.pdfp.infodict()
+
         self.info['Title'] = title
         self.info['Author'] = 'pulsarpkg'
 
@@ -55,7 +60,7 @@ def show():
 
 
 def show_dyn(dyn_obj: computing.Dynamic, save=False, pdf: Pdf=None):
-    fig = show_image(dyn_obj.dyn, dyn_obj.get_y_axis(), dyn_obj.get_x_axis())
+    fig = show_image(dyn_obj.dyn, dyn_obj.get_dyn_y_axis(), dyn_obj.get_dyn_x_axis())
     plt.title(dyn_obj.filename)
     plt.xlabel('Time (MJD - {0}) [s]'.format(dyn_obj.hdu_header['MJD']))
     plt.ylabel('Frequency [MHz]')
@@ -63,15 +68,14 @@ def show_dyn(dyn_obj: computing.Dynamic, save=False, pdf: Pdf=None):
         plt.savefig('{0}_dyn.pdf'.format(dyn_obj.filename), format='pdf')
     if pdf:
         pdf.save(fig)
-    plt.close()
+    # plt.close()
     return
 
 
-def show_sec(sec_obj: computing.Secondary, save=False, pdf=None):
+def show_sec(sec_obj: computing.Secondary, save=False, pdf: Pdf=None):
     """
     plots the secondary spectrum to the current figure in matplotlib
     :param sec_obj: "Secondary" object
-    :return:
     :return:
     """
     fig = show_image(sec_obj.get_sec(), sec_obj.get_y_axis(), sec_obj.get_x_axis())

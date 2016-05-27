@@ -120,10 +120,10 @@ class Dynamic:
         time = list(np.linspace(0, t_int, nsubs))
         return frequency, time
 
-    def get_y_axis(self):
+    def get_dyn_y_axis(self):
         return self.dyni.y_axis
 
-    def get_x_axis(self):
+    def get_dyn_x_axis(self):
         return self.dyni.x_axis
 
 

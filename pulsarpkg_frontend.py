@@ -36,7 +36,7 @@ def parse_args():
     query.add_argument('-av', '--attr-value', help='attribute value or range (see --mjd)', nargs='+')
     query.add_argument('-d', '--dyn', action="store_true", help='Plot the dynamic spectrum')
     query.add_argument('-s', '--sec', action="store_true", help='Plot the secondary spectrum')
-    query.add_argument('-t', '--store', action="store_true", help='store the images to files', default='pdf')
+    query.add_argument('-t', '--store', action="store_true", help='store the images to files')
     query.add_argument('-p', '--pdf', action="store_true", help='store all of the images in one pdf')
     query.add_argument('-wf', '--write-files', action="store_true", help='write the rows from the DB back to the files')
     query.add_argument('--csv', help='Write a csv file to CSV')
@@ -119,7 +119,6 @@ def main(args):
             result = db.extract(attr_dict)
         elif args.f:
             result = files.files
-            print(result)
             pass
         else:
             result = []
@@ -185,7 +184,7 @@ def main(args):
             if args.sec:  # plot dynamic and secondary
                 sec = computing.Secondary(hdulist, header, filename)
                 if args.dyn:
-                    plotting.show_dyn(sec)
+                    plotting.show_dyn(sec, args.store, pdf)
                 plotting.show_sec(sec, args.store, pdf)
             if not args.pdf:
                 plotting.show()  # don't plot to screen when creating a pdf

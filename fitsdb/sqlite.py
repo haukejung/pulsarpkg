@@ -19,7 +19,6 @@ class Files:
         self.debug = debug
         self.imported = False
         self.fits = None
-        print(file)
         self.files = self.get_file_list(file)
 
     def get_file_list(self, search_list, debug=False, verbose=False):
@@ -80,7 +79,6 @@ class DB(Files):
         Files.__init__(self, file, debug, verbose)
         self.fraction = 0
         db = os.access(self.file, os.F_OK)
-        print('self.file', self.file)
         self.conn = sqlite3.connect(self.file, detect_types=sqlite3.PARSE_DECLTYPES)
         self.conn.row_factory = sqlite3.Row  # makes the results of querys a dict instead of a tuple
         self.cursor = self.conn.cursor()
