@@ -6,6 +6,7 @@ from time import strftime
 
 
 cmap = 'viridis'  # set default colormap
+datenow = strftime("%Y-%m-%d_%H-%M-%S")
 
 
 class Pdf:
@@ -17,11 +18,11 @@ class Pdf:
         for attr, value in attr_dict.items():
             title += '{0}: {1}, '.format(attr, value)
             name += '_{0}_{1}'.format(attr, value.replace(' ', '_'))
-        title = title[:-2]
         if len(attr_dict) > 0:
-            title += ' )'
+            title = title[:-2]
+            title += ')'
 
-        self.pdfp = PdfPages(name+'_{0}.pdf'.format(strftime("%Y-%m-%d_%H-%M-%S")))
+        self.pdfp = PdfPages(name+'_{0}.pdf'.format(datenow))
         self.info = self.pdfp.infodict()
 
         self.info['Title'] = title

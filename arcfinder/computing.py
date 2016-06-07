@@ -96,8 +96,9 @@ class Dynamic:
         dyn_med_std = np.std(dynamic - dyn_median)
 
         # sets values 9 SDs above the mean and values less than 0 to 0
-        index = np.where(np.logical_or(dynamic >= dyn_median + (float(outliers_sigma) * dyn_med_std), dynamic < 0.))
-        dynamic[index] = 0.
+        # index = np.where(np.logical_or(dynamic >= dyn_median + (float(outliers_sigma) * dyn_med_std), dynamic < 0.))
+        index = np.where(dynamic >= dyn_median + (float(outliers_sigma) * dyn_med_std))
+        dynamic[index] = dyn_median
 
         if normalize_frequency:
             dynamic = arr_normalize_axis(dynamic, 'y')
@@ -299,7 +300,7 @@ class Secondary(Dynamic):  # Secondary inherits the Dynamic class
         :param hand:
         :return:
         """
-        Dynamic.__init__(self, data, db_header)
+        Dynamic.__init__(self, data, db_header, filename)
         data = self.get_secondary_spectrum()
         axes = self.get_sec_axes()
 
@@ -307,7 +308,7 @@ class Secondary(Dynamic):  # Secondary inherits the Dynamic class
         self.hand = hand
         self.made_1D = False
         self.parabola_power = {}
-        self.observation_name = self.db_header["filename"]
+        self.observation_name = filename
         self.band = str(self.observation_name)
 
     def __getitem__(self, value):
@@ -354,7 +355,7 @@ class Secondary(Dynamic):  # Secondary inherits the Dynamic class
             maxindex = np.where(histSec[0] == np.max(histSec[0]))  # where frequency of occurences is highest
             xVal = int(maxindex[0])  # position of peak in noise
             xValDb = np.min(secondary)+binsize*xVal+3.  # value of peak in noise offset up by 3Db
-            index = np.where(secondary<xValDb) 
+            index = np.where(secondary < xValDb)
             if index != -1:  # if there are values less than threshold value
                 secondary[index] = xValDb
 

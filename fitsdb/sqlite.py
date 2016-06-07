@@ -2,7 +2,7 @@ import os
 import sqlite3
 import glob
 import numpy as np
-
+import warnings
 
 class Files:
     """
@@ -20,6 +20,9 @@ class Files:
         self.imported = False
         self.fits = None
         self.files = self.get_file_list(file)
+        self.verbose = verbose
+        if not debug:
+            warnings.simplefilter('ignore', UserWarning)
 
     def get_file_list(self, search_list, debug=False, verbose=False):
         """
@@ -33,7 +36,7 @@ class Files:
         for string in search_list:
             for stri in glob.glob(string):
                 file_list.append(stri)
-        assert file_list != [], 'No files found.'
+        # assert file_list != [], 'No files found.'
         return file_list
 
     def get_header_data(self, filename):
@@ -60,7 +63,8 @@ class Files:
         :return:
         """
         self.import_fits()
-        del(header[""])     # removing all empty headers
+        if '' in header.keys():
+            del(header[''])     # removing all empty header
         for key, value in header.items():
             if isinstance(value, self.fits.card.Undefined):
                 header[key] = None
@@ -181,7 +185,7 @@ class DB(Files):
             print(files)
         self.fraction = 0
         for file in files:
-            header_id = self.get_id(file)     # will be None if file is not found in the DB
+            header_id = self.get_id(file)     # will be [] if file is not found in the DB
             hdulist, header, astrodata = self.get_header_data(file)
             # del(header[""])     # removing all empty headers
             # print('header', header)
@@ -230,6 +234,9 @@ class DB(Files):
                 self.cursor.execute(command, (astrodata, str(header_id[0][0])))
                 self.conn.commit()
             self.fraction += 1/len(files)
+            if self.verbose:
+                print('\r{0}%'.format(self.report_percentage()), end='')
+        print("")
 
     def extract(self, attributes: dict):
         """

@@ -13,6 +13,8 @@ from arcfinder import plotting
 import argparse
 from collections import OrderedDict
 
+from time import strftime
+
 
 def parse_args():
     """
@@ -23,7 +25,7 @@ def parse_args():
     subparsers = parser.add_subparsers()
     ingest = subparsers.add_parser('ingest', help='ingest files')
     ingest.set_defaults(subcmd='ingest')
-    ingest.add_argument('files', help='filenames, e.g. "dir/*.fits"')
+    ingest.add_argument('files', help='filenames, e.g. "dir/*.fits"', nargs='+')
     sql = subparsers.add_parser('sql', help='SQL-Statement to query, e.g. "SELECT * FROM headers")')
     sql.set_defaults(subcmd='sql')
     query = subparsers.add_parser('query', help='Query the database')
@@ -39,7 +41,7 @@ def parse_args():
     query.add_argument('-t', '--store', action="store_true", help='store the images to files')
     query.add_argument('-p', '--pdf', action="store_true", help='store all of the images in one pdf')
     query.add_argument('-wf', '--write-files', action="store_true", help='write the rows from the DB back to the files')
-    query.add_argument('--csv', help='Write a csv file to CSV')
+    query.add_argument('--csv', action="store_true", help='Write a csv file')
     query.add_argument('--cmap', help='Choose the colormap from the matplotlib palette, default is "viridis"')
 
     positional = parser.add_mutually_exclusive_group(required='True')
@@ -136,12 +138,10 @@ def main(args):
             print(hline[:-1])  # remove the last "|"
 
         csv = ''
-        if args.csv:  # create first row for csv
-            for key in result[0][1].keys():
-                if key != 'DATA':
-                    csv += '{0};'.format(key)
-            csv += '\n'
 
+        all_keys = []  # gather headers of files for csv in there
+        if args.f:
+            all_keys.append("filename")
         pdf = None
         if args.pdf:
             pdf = plotting.Pdf(attr_dict)
@@ -163,8 +163,11 @@ def main(args):
                             csv += '{0};'.format(header[key])
                     csv += '\n'
                 elif args.f:
+                    csv += '{0};'.format(res)
                     for key in header.keys():
-                        csv += '{0};'.format(header[key])
+                        if key not in all_keys:
+                            all_keys.append(key)
+                            csv += '{0};'.format(header[key]) if key in all_keys else ';'
                     csv += '\n'
 
             # text output
@@ -190,8 +193,22 @@ def main(args):
                 plotting.show()  # don't plot to screen when creating a pdf
             # end for-loop
         if args.csv:
-            with open(args.csv, 'w') as f:
-                f.write(csv)
+            csv_head = ''
+            if args.db:
+                for key in result[0][1].keys():
+                    if key != 'DATA':
+                        csv_head += '{0};'.format(key)
+                csv_head += '\n'
+            if args.f:
+                for key in all_keys:
+                    csv_head += '{0};'.format(key)
+                csv_head += '\n'
+            name = 'pulsarpkg_query'  # filename
+            for attr, value in attr_dict.items():
+                name += '_{0}_{1}'.format(attr, value.replace(' ', '_'))
+            name += '_{0}.csv'.format(plotting.datenow)
+            with open(name, 'w') as f:
+                f.write(csv_head+csv)
 
 
 if __name__ == '__main__':
