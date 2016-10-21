@@ -4,6 +4,7 @@ import glob
 import numpy as np
 import warnings
 
+
 class Files:
     """
     Files class for accessing fits files directly
@@ -190,7 +191,7 @@ class DB(Files):
             # del(header[""])     # removing all empty headers
             # print('header', header)
             self.check_columns(header.keys())
-            if not header_id:
+            if not header_id:  # file not in the database yet
                 # INSERT
                 keys = []
                 keys.extend(['filename', 'keywords'])
@@ -238,7 +239,7 @@ class DB(Files):
                 print('\r{0}%'.format(self.report_percentage()), end='')
         print("")
 
-    def extract(self, attributes: dict):
+    def extract(self, attributes: dict, writetofile=False):
         """
         Extract data from the database
         :type attributes: dict
@@ -255,7 +256,7 @@ class DB(Files):
             for attribute, value in attributes.items():
                 # check if attributes are present in the database
                 if attribute not in columns:
-                    raise NameError("Attribute %s not found in database" % attribute)
+                    raise NameError("Attribute {0} not found in database".format(attribute))
                 if attribute is 'MJD':
                     command += '`MJD` >= ? AND `MJD` <= ? AND '
                     values.extend(value.split(" "))
@@ -281,7 +282,7 @@ class DB(Files):
 
         ret_list = []
         for row in rows:
-            hdulist = self.create_hdulist_from_row(row)
+            hdulist = self.create_hdulist_from_row(row, writetofile)
             # TODO: could delete the DATA field as we don't need it from now on
             ret_list.append((hdulist, row))
         return ret_list
@@ -296,7 +297,7 @@ class DB(Files):
         for key in row.keys():
             key = str(key)
             if key in ['id', 'filename', 'ctime', 'mtime', 'keywords', 'headers_id', 'DATA']:
-                # we don't want those in the header
+                # we don't want those in the FITS-header
                 continue
             header.extend([(key, row[key])])
         hdulist = self.fits.HDUList()  # start creating the new HDU list
@@ -311,13 +312,12 @@ class DB(Files):
             print("The NAXIS parameters don't match the data (%i <> %i)."
                   % (len(data), row["NAXIS2"]*row["NAXIS1"]))
             return hdulist  # return the empty list to not abort the program
-        data = np.rot90(data)
 
         imagehdu = self.fits.ImageHDU(data=data, header=header)
         hdulist.append(imagehdu)
-
         if writetofile:
-            hdulist.writeto(row["filename"], output_verify='fix')  # writes the file back to a file
+            hdulist.writeto(row["filename"], output_verify='fix')  # writes the hdulist back to a FITS-file
+
         return hdulist
 
 

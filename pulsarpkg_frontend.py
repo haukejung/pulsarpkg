@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 """
 
 Command line help available by running:
@@ -34,7 +34,7 @@ def parse_args():
     query.add_argument('--pulsar', help='Full pulsar name')
     query.add_argument('--mjd', help='MJD-range in the form of "51000 52000"')
     query.add_argument('--freq', help='Frequency bandwidth (MHz) in the form of "300 400"')
-    query.add_argument('-a', '--attr', help='other attribute, e.g. --attr "T_INT', nargs='+')
+    query.add_argument('-a', '--attr', help='other attribute, e.g. --attr "T_INT"', nargs='+')
     query.add_argument('-av', '--attr-value', help='attribute value or range (see --mjd)', nargs='+')
     query.add_argument('-d', '--dyn', action="store_true", help='Plot the dynamic spectrum')
     query.add_argument('-s', '--sec', action="store_true", help='Plot the secondary spectrum')
@@ -118,7 +118,7 @@ def main(args):
             print('attr_dict', attr_dict)
 
         if args.db:
-            result = db.extract(attr_dict)
+            result = db.extract(attr_dict, args.write_files)
         elif args.f:
             result = files.files
             pass
@@ -147,6 +147,7 @@ def main(args):
             pdf = plotting.Pdf(attr_dict)
 
         for res in result:
+            rotate = False
             if args.db:
                 hdulist = res[0]
                 header = res[1]
@@ -154,6 +155,7 @@ def main(args):
             elif args.f:
                 hdulist, header, data = files.get_header_data(res)
                 filename = res
+                rotate = True if not args.write_files else False
 
             # csv
             if args.csv:
@@ -182,15 +184,15 @@ def main(args):
 
             # Plotting:
             if args.dyn and not args.sec:  # only plot dynamic
-                dyn = computing.Dynamic(hdulist, header, filename)
+                dyn = computing.Dynamic(hdulist, header, filename, rotate)
                 plotting.show_dyn(dyn, args.store, pdf)
             if args.sec:  # plot dynamic and secondary
-                sec = computing.Secondary(hdulist, header, filename)
+                sec = computing.Secondary(hdulist, header, filename, rotate)
                 if args.dyn:
                     plotting.show_dyn(sec, args.store, pdf)
                 plotting.show_sec(sec, args.store, pdf)
-            if not args.pdf:
-                plotting.show()  # don't plot to screen when creating a pdf
+            if not args.pdf:  # don't plot to screen when creating a pdf
+                plotting.show()
             # end for-loop
         if args.csv:
             csv_head = ''

@@ -59,19 +59,21 @@ def arr_normalize_axis(arr, axis=None, mask=None):
 
 
 class Dynamic:
-    def __init__(self, data: fits.HDUList, db_header: dict, filename=None):
+    def __init__(self, data: fits.HDUList, db_header: dict, filename=None, rotate=False):
         """
         Initialize the dynamic spectrum class with a header and the corresponding dynamic spectrum
-        :param data:
+        :param data: the raw data
+        :param rotate: rotate when handling local fits files
         """
         self.hdu_header = data[0].header
         self.db_header = db_header
         self.filename = filename if filename else self.db_header['filename']
+        self.rotate = rotate
         self.dyn = self.get_dynamic_spectrum(data[0].data)
+
         self.dyni = Indexed2D(data=self.dyn, axes=self.get_dyn_axes())
 
-    @staticmethod
-    def get_dynamic_spectrum(data, normalize_frequency=False, normalize_time=True, outliers_sigma=7):
+    def get_dynamic_spectrum(self, data, normalize_frequency=False, normalize_time=True, outliers_sigma=7):
         """
         returns a numpy array containing the dynamic spectrum.
         :param data: plain numpy array
@@ -82,8 +84,8 @@ class Dynamic:
         :param outliers_sigma:
         :return: the dynamic spectrum as a numpy array
         """
-        dynamic = data
-        # dynamic = np.rot90(data)
+        # dynamic = data
+        dynamic = np.rot90(data) if self.rotate else data
         # dyn_mean = np.mean(dynamic)
         # dyn_std = np.std(dynamic)
 
@@ -112,10 +114,12 @@ class Dynamic:
         :return: a list of tuples ([conjugate frequency axis values],[conjugate time axis values])
         """
         t_int = float(self.hdu_header["T_INT"])  # total integration time
-        nsubs = int(self.hdu_header["NAXIS1"])  # number of time subintegrations
+        naxis1 = int(self.hdu_header["NAXIS1"])
+        naxis2 = int(self.hdu_header["NAXIS2"])
+        nsubs = naxis2 if self.rotate else naxis1  # number of time subintegrations
         freq = float(self.hdu_header["FREQ"])  # centre frequency
         BW = abs(float(self.hdu_header["BW"]))  # bandwidth
-        nchans = int(self.hdu_header["NAXIS2"])  # using NAXIS1 instead of NCHANS, because NCHANS isn't always set
+        nchans = naxis1 if self.rotate else naxis2  # using NAXIS1 instead of NCHANS, because NCHANS isn't always set
 
         frequency = list(np.linspace(freq-BW/2, freq+BW/2, nchans))
         time = list(np.linspace(0, t_int, nsubs))
@@ -293,14 +297,14 @@ class Indexed2D:
 
 # this class constructs, contains, and displays secondary spectra.
 class Secondary(Dynamic):  # Secondary inherits the Dynamic class
-    def __init__(self, data: fits.HDUList, db_header: dict, filename=None, hand=None):
+    def __init__(self, data: fits.HDUList, db_header: dict, filename=None, rotate=False, hand=None):
         """
         initialize me with an dynamic object
         :param data:
         :param hand:
         :return:
         """
-        Dynamic.__init__(self, data, db_header, filename)
+        Dynamic.__init__(self, data, db_header, filename, rotate)
         data = self.get_secondary_spectrum()
         axes = self.get_sec_axes()
 
@@ -379,11 +383,12 @@ class Secondary(Dynamic):  # Secondary inherits the Dynamic class
         finds the axes that correspond to the secondary spectrum plot.
         :return: a list of tuples ([conjugate frequency axis values],[conjugate time axis values])
         """
-        t_int = float(self.hdu_header["T_INT"])
-        naxis2 = int(self.hdu_header["NAXIS1"])  # number of time subintegrations
-        BW = float(self.hdu_header["BW"])
-        # nchans = int(self.hdu_header["NCHANS"])  # number of channels
-        nchans = int(self.hdu_header["NAXIS2"])  # using NAXIS1 instead of NCHANS, because NCHANS isn't always set
+        t_int = float(self.hdu_header["T_INT"])  # total integration time
+        naxis1_ = int(self.hdu_header["NAXIS1"])
+        naxis2_ = int(self.hdu_header["NAXIS2"])
+        naxis2 = naxis2_ if self.rotate else naxis1_
+        BW = abs(float(self.hdu_header["BW"]))  # bandwidth
+        nchans = naxis1_ if self.rotate else naxis2_
 
         nyq_t = 1000. / (2. * t_int)  # nyquist frequency for the delay axis of the secondary spectrum
         nyq_f = nchans / (2. * BW)  # nyquist frequency for the fringe frequency axis of the secondary spectrum
