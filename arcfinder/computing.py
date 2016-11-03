@@ -89,10 +89,13 @@ class Dynamic:
         # dyn_mean = np.mean(dynamic)
         # dyn_std = np.std(dynamic)
 
-        # for row in range(len(dynamic)):
-        #     for col in range(len(dynamic[row])):
-        #         if np.abs(dynamic[row][col] - dyn_mean) > float(outliers_sigma) * dyn_std:
-        #             dynamic[row][col] = dyn_mean
+        # compute median only with values other than 0 and NaN
+        index = np.where(np.logical_or(dynamic < 0., dynamic > 0.))
+        dyn_median = np.median(dynamic[index])
+        for row in range(len(dynamic)):
+            for col in range(len(dynamic[row])):
+                if dynamic[row][col] == 0 or np.isnan(dynamic[row][col]):
+                    dynamic[row][col] = dyn_median
 
         dyn_median = np.mean(dynamic)
         dyn_med_std = np.std(dynamic - dyn_median)
@@ -340,9 +343,11 @@ class Secondary(Dynamic):  # Secondary inherits the Dynamic class
         dynamic = self.dyn
         dynamic = dynamic - np.mean(dynamic)
         secondary = np.fft.fftn(dynamic)
+
         # secondary /= secondary.max()
         secondary = np.abs(np.fft.fftshift(secondary))**2
         secondary = 10. * np.log10(secondary/np.max(secondary))  # in decibels
+
         if normalize_frequency:
             mask = [1. if i < len(secondary[0]) / 4. or i > 3 * len(secondary[0]) / 4. else 0. for i in
                     range(len(secondary[0]))]

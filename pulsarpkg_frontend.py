@@ -152,6 +152,7 @@ def main(args):
                 hdulist = res[0]
                 header = res[1]
                 filename = header['filename']
+                rotate = True
             elif args.f:
                 hdulist, header, data = files.get_header_data(res)
                 filename = res
