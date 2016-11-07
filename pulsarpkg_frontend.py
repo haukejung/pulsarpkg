@@ -43,6 +43,8 @@ def parse_args():
     query.add_argument('-wf', '--write-files', action="store_true", help='write the rows from the DB back to the files')
     query.add_argument('--csv', action="store_true", help='Write a csv file')
     query.add_argument('--cmap', help='Choose the colormap from the matplotlib palette, default is "viridis"')
+    query.add_argument('-e', '--delete', action="store_true", help='Delete the entries that match the query\n'
+                                                                   'DOESN\'T ASK FOR CONFIRMATION')
 
     positional = parser.add_mutually_exclusive_group(required='True')
     positional.add_argument('-b', '--db', action="store_true", help='switch for using a sqlite database')
@@ -146,9 +148,12 @@ def main(args):
         if args.pdf:
             pdf = plotting.Pdf(attr_dict)
 
+        delete_ids = []
         for res in result:
-            rotate = False
             if args.db:
+                if args.delete:
+                    delete_ids.append(res[1]["id"])
+                rotate = False
                 hdulist = res[0]
                 header = res[1]
                 filename = header['filename']
@@ -195,6 +200,11 @@ def main(args):
             if not args.pdf:  # don't plot to screen when creating a pdf
                 plotting.show()
             # end for-loop
+
+        if args.delete:
+            db.delete(delete_ids)  # delete all ids in "delete"
+            print('\nDeleted all matching rows!')
+
         if args.csv:
             csv_head = ''
             if args.db:

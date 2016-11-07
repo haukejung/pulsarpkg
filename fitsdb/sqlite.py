@@ -287,6 +287,22 @@ class DB(Files):
             ret_list.append((hdulist, row))
         return ret_list
 
+    def delete(self, id_list):
+        if len(id_list) == 0:
+            raise ValueError('No entries to delete')
+        command = 'DELETE FROM astrodata WHERE headers_id = ?'
+        command2 = 'DELETE FROM headers WHERE id = ?'
+        for id_ in range(1, len(id_list)):
+            command += ' or headers_id = ?'
+            command2 += ' or id = ?'
+
+        if self.debug:
+            log_sql_stmt(self.cursor, command, *id_list)
+            log_sql_stmt(self.cursor, command2, *id_list)
+        self.cursor.execute(command, tuple(id_list))
+        self.cursor.execute(command2, tuple(id_list))
+        self.conn.commit()
+
     def create_hdulist_from_row(self, row, writetofile=False):
         """
         Creates an astropy HDUList object from a database row
