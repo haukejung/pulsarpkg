@@ -1,11 +1,4 @@
 #! /usr/bin/env python3
-"""
-
-Command line help available by running:
-> python fits2sqlite -h
-
-"""
-
 from fitsdb import sqlite
 from arcfinder import computing
 from arcfinder import plotting
@@ -35,7 +28,7 @@ def parse_args():
     query.add_argument('--mjd', help='MJD-range in the form of "51000 52000"')
     query.add_argument('--freq', help='Frequency bandwidth (MHz) in the form of "300 400"')
     query.add_argument('-a', '--attr', help='other attribute, e.g. --attr "T_INT"', nargs='+')
-    query.add_argument('-av', '--attr-value', help='attribute value or range (see --mjd)', nargs='+')
+    query.add_argument('-r', '--attr-value', help='attribute value or range (see --mjd)', nargs='+')
     query.add_argument('-d', '--dyn', action="store_true", help='Plot the dynamic spectrum')
     query.add_argument('-s', '--sec', action="store_true", help='Plot the secondary spectrum')
     query.add_argument('-t', '--store', action="store_true", help='store the images to files')
@@ -79,8 +72,10 @@ def create_attr_dict(args, outp, stdlength=10):
     # add output attributes if specified
     if args.attr and args.attr_value:
         for a, v in zip(args.attr, args.attr_value):
+            a = a.strip('\'\"')
+            v = v.strip('\'\"')
             attr_dict[a] = v
-            if a not in outp['keys']:
+            if a not in outp.keys():
                 outp[a] = stdlength  # std length for attributes is 10
     return attr_dict
 
