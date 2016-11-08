@@ -58,6 +58,22 @@ def arr_normalize_axis(arr, axis=None, mask=None):
         raise Exception("invalid axis specification.")
 
 
+def repl_nonvals_wmed(array):
+    """
+    Replaces Non-values like NaN (and 0, because it makes trouble) with the median
+    Median is computed only with values other than 0 and NaN
+    :param array: Numpy array
+    :return tuple of the array and the median
+    """
+    index = np.where(np.logical_or(array < 0., array > 0.))
+    median = np.median(array[index])
+    for row in range(len(array)):
+        for col in range(len(array[row])):
+            if array[row][col] == 0 or np.isnan(array[row][col]):
+                array[row][col] = median
+    return array, median
+
+
 class Dynamic:
     def __init__(self, data: fits.HDUList, db_header: dict, filename=None, rotate=False):
         """
@@ -89,15 +105,8 @@ class Dynamic:
         # dyn_mean = np.mean(dynamic)
         # dyn_std = np.std(dynamic)
 
-        # compute median only with values other than 0 and NaN
-        index = np.where(np.logical_or(dynamic < 0., dynamic > 0.))
-        dyn_median = np.median(dynamic[index])
-        for row in range(len(dynamic)):
-            for col in range(len(dynamic[row])):
-                if dynamic[row][col] == 0 or np.isnan(dynamic[row][col]):
-                    dynamic[row][col] = dyn_median
+        dynamic, dyn_median = repl_nonvals_wmed(dynamic)
 
-        dyn_median = np.mean(dynamic)
         dyn_med_std = np.std(dynamic - dyn_median)
 
         # sets values 9 SDs above the mean and values less than 0 to 0
@@ -343,6 +352,8 @@ class Secondary(Dynamic):  # Secondary inherits the Dynamic class
         dynamic = self.dyn
         dynamic = dynamic - np.mean(dynamic)
         secondary = np.fft.fftn(dynamic)
+
+        secondary, sec_median = repl_nonvals_wmed(secondary)
 
         # secondary /= secondary.max()
         secondary = np.abs(np.fft.fftshift(secondary))**2
