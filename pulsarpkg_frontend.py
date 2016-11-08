@@ -29,6 +29,7 @@ def parse_args():
     query.add_argument('--freq', help='Frequency bandwidth (MHz) in the form of "300 400"')
     query.add_argument('-a', '--attr', help='other attribute, e.g. --attr "T_INT"', nargs='+')
     query.add_argument('-r', '--attr-value', help='attribute value or range (see --mjd)', nargs='+')
+    query.add_argument('--attr-list', action="store_true", help='get a list of available attributes')
     query.add_argument('-d', '--dyn', action="store_true", help='Plot the dynamic spectrum')
     query.add_argument('-s', '--sec', action="store_true", help='Plot the secondary spectrum')
     query.add_argument('-t', '--store', action="store_true", help='store the images to files')
@@ -99,6 +100,14 @@ def main(args):
     elif args.subcmd == 'query':
         if args.cmap:
             plotting.cmap = args.cmap
+
+        if args.attr_list:
+            attrs = db.get_columns()
+            print("List of available attributes:")
+            for attr in attrs:
+                print(attr)
+            exit(0)
+
 
         # outp = OrderedDict(id=4, filename=30, ORIGIN=23, MJD=18, FREQ=12, BW=10)
         outp = OrderedDict()  # consists of the output columns and their corresponding widths
