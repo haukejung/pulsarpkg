@@ -108,7 +108,6 @@ def main(args):
                 print(attr)
             exit(0)
 
-
         # outp = OrderedDict(id=4, filename=30, ORIGIN=23, MJD=18, FREQ=12, BW=10)
         outp = OrderedDict()  # consists of the output columns and their corresponding widths
         if not args.f:

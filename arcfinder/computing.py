@@ -89,7 +89,7 @@ class Dynamic:
 
         self.dyni = Indexed2D(data=self.dyn, axes=self.get_dyn_axes())
 
-    def get_dynamic_spectrum(self, data, normalize_frequency=False, normalize_time=True, outliers_sigma=7):
+    def get_dynamic_spectrum(self, data, normalize_frequency=False, normalize_time=True, outliers_sigma=9):
         """
         returns a numpy array containing the dynamic spectrum.
         :param data: plain numpy array
