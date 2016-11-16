@@ -4,6 +4,8 @@ from . import computing
 from matplotlib.backends.backend_pdf import PdfPages
 from time import strftime
 
+import functions
+
 
 cmap = 'viridis'  # set default colormap
 datenow = strftime("%Y-%m-%d_%H-%M-%S")
@@ -60,7 +62,7 @@ def show():
     plt.show()
 
 
-def show_dyn(dyn_obj: computing.Dynamic, save=False, fmt=None, pdf: Pdf=None):
+def show_dyn(dyn_obj, save=False, fmt=None, pdf=None):
     """
     plots the dynamic spectrum to the current figure in matplotlib
     :param dyn_obj: "Dynamic" object
@@ -68,6 +70,9 @@ def show_dyn(dyn_obj: computing.Dynamic, save=False, fmt=None, pdf: Pdf=None):
     :param fmt: format that the matplotlib-backend then uses
     :param pdf: pdf object
     """
+    functions.check_object_type(dyn_obj, computing.Dynamic)
+    functions.check_object_type(pdf, Pdf)
+
     fig = show_image(dyn_obj.dyn, dyn_obj.get_dyn_y_axis(), dyn_obj.get_dyn_x_axis())
     plt.title(dyn_obj.filename)
     plt.xlabel('Time (MJD - {0}) [s]'.format(dyn_obj.hdu_header['MJD']))
@@ -83,7 +88,7 @@ def show_dyn(dyn_obj: computing.Dynamic, save=False, fmt=None, pdf: Pdf=None):
     # plt.close()
 
 
-def show_sec(sec_obj: computing.Secondary, save=False, fmt=None, pdf: Pdf=None):
+def show_sec(sec_obj, save=False, fmt=None, pdf=None):
     """
     plots the secondary spectrum to the current figure in matplotlib
     :param sec_obj: "Secondary" object
@@ -91,6 +96,8 @@ def show_sec(sec_obj: computing.Secondary, save=False, fmt=None, pdf: Pdf=None):
     :param fmt: format that the matplotlib-backend then uses
     :param pdf: pdf object
     """
+    functions.check_object_type(sec_obj, computing.Secondary)
+    functions.check_object_type(pdf, Pdf)
     fig = show_image(sec_obj.get_sec(), sec_obj.get_y_axis(), sec_obj.get_x_axis())
     if sec_obj.made_1D:
         overplot_parabolas(sec_obj, [min(sec_obj.etas), max(sec_obj.etas)])
@@ -107,7 +114,7 @@ def show_sec(sec_obj: computing.Secondary, save=False, fmt=None, pdf: Pdf=None):
         pdf.save(fig)
 
 
-def overplot_parabolas(sec_obj: computing.Secondary, etas, offsets=None):
+def overplot_parabolas(sec_obj, etas, offsets=None):
     """
     plots parabolas over the secondary spectrum.
     :param sec_obj:
@@ -115,6 +122,8 @@ def overplot_parabolas(sec_obj: computing.Secondary, etas, offsets=None):
     :param offsets: a list of the y-offsets desired for the parabolas
     :return: nothing, but plots the parabolas to the current matplotlib figure.
     """
+    functions.check_object_type(sec_obj, computing.Secondary)
+
     if offsets is None:
         offsets = [0.]
     for eta in etas:

@@ -2,6 +2,8 @@ import multiprocessing as mp
 from .multiprocessing_helper_functions import *
 from astropy.io import fits
 
+import functions
+
 
 def sort_dict_by_key(dictionary):
     """
@@ -75,12 +77,15 @@ def repl_nonvals_wmed(array):
 
 
 class Dynamic:
-    def __init__(self, data: fits.HDUList, db_header: dict, filename=None, rotate=False):
+    def __init__(self, data, db_header, filename=None, rotate=False):
         """
         Initialize the dynamic spectrum class with a header and the corresponding dynamic spectrum
         :param data: the raw data
         :param rotate: rotate when handling local fits files
         """
+        functions.check_object_type(data, fits.HDUList)
+        functions.check_object_type(db_header, dict)
+
         self.hdu_header = data[0].header
         self.db_header = db_header
         self.filename = filename if filename else self.db_header['filename']
@@ -307,13 +312,17 @@ class Indexed2D:
 
 # this class constructs, contains, and displays secondary spectra.
 class Secondary(Dynamic):  # Secondary inherits the Dynamic class
-    def __init__(self, data: fits.HDUList, db_header: dict, filename=None, rotate=False, hand=None):
+    def __init__(self, data, db_header, filename=None, rotate=False, hand=None):
         """
         initialize me with an dynamic object
         :param data:
         :param hand:
         :return:
         """
+        if not isinstance(data, fits.HDUList):
+            TypeError('data is not a HDUList')
+        if not isinstance(db_header, dict):
+            TypeError('db_header is not a dict')
         Dynamic.__init__(self, data, db_header, filename, rotate)
         data = self.get_secondary_spectrum()
         axes = self.get_sec_axes()

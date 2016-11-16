@@ -1,3 +1,7 @@
+from __future__ import print_function
+
+import functions
+
 import os
 import sqlite3
 import glob
@@ -80,7 +84,7 @@ class DB(Files):
     FitsDB class for storing fits files in a sqlite database
     """
     def __init__(self, file, debug=False, verbose=False):
-        assert isinstance(file, list)
+        functions.check_object_type(file, list)
         Files.__init__(self, file, debug, verbose)
         self.fraction = 0
         db = os.access(self.file, os.F_OK)
@@ -239,12 +243,14 @@ class DB(Files):
                 print('\r{0}%'.format(self.report_percentage()), end='')
         print("")
 
-    def extract(self, attributes: dict, writetofile=False):
+    def extract(self, attributes, writetofile=False):
         """
         Extract data from the database
         :type attributes: dict
         :return: List of astropy HDU lists
         """
+        functions.check_object_type(attributes, dict)
+
         self.import_fits()
         columns = self.get_columns()
         command = 'SELECT * FROM headers '

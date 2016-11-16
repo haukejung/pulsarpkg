@@ -1,12 +1,15 @@
-#! /usr/bin/env python3
+from __future__ import division
+from __future__ import with_statement
+from __future__ import print_function
+
 from fitsdb import sqlite
 from arcfinder import computing
 from arcfinder import plotting
 
+import astropy.utils.console
+
 import argparse
 from collections import OrderedDict
-
-from time import strftime
 
 
 def parse_args():
@@ -95,7 +98,11 @@ def main(args):
     elif args.f:
         files = sqlite.Files(args.file, args.debug, args.verbose)
     if args.subcmd == 'ingest':
-        db.ingest_data(args.files)
+        file_list = db.get_file_list(args.files)
+        with astropy.utils.console.ProgressBarOrSpinner(len(file_list), "Ingesting..") as bar:
+            for i in range(1, len(file_list)):
+                db.ingest_data([file_list[i]])
+                bar.update(i)
     elif args.subcmd == 'sql':
         for row in db.sql(args.sql):
             print(tuple(row))
