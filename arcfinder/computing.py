@@ -104,11 +104,9 @@ class Dynamic:
         dynamic = np.rot90(data) if self.rotate else data
         # dyn_mean = np.mean(dynamic)
         # dyn_std = np.std(dynamic)
-
         dynamic, dyn_median = repl_nonvals_wmed(dynamic)
 
         dyn_med_std = np.std(dynamic - dyn_median)
-
         # sets values 9 SDs above the mean and values less than 0 to 0
         # index = np.where(np.logical_or(dynamic >= dyn_median + (float(outliers_sigma) * dyn_med_std), dynamic < 0.))
         index = np.where(dynamic >= dyn_median + (float(outliers_sigma) * dyn_med_std))

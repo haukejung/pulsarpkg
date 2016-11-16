@@ -60,24 +60,36 @@ def show():
     plt.show()
 
 
-def show_dyn(dyn_obj: computing.Dynamic, save=False, pdf: Pdf=None):
+def show_dyn(dyn_obj: computing.Dynamic, save=False, fmt=None, pdf: Pdf=None):
+    """
+    plots the dynamic spectrum to the current figure in matplotlib
+    :param dyn_obj: "Dynamic" object
+    :param save: save image to file
+    :param fmt: format that the matplotlib-backend then uses
+    :param pdf: pdf object
+    """
     fig = show_image(dyn_obj.dyn, dyn_obj.get_dyn_y_axis(), dyn_obj.get_dyn_x_axis())
     plt.title(dyn_obj.filename)
     plt.xlabel('Time (MJD - {0}) [s]'.format(dyn_obj.hdu_header['MJD']))
     plt.ylabel('Frequency [MHz]')
     if save:
-        plt.savefig('{0}_dyn.pdf'.format(dyn_obj.filename), format='pdf')
+        if pdf and not fmt:
+            fmt = 'pdf'
+        if not pdf:
+            plt.savefig('{0}_dyn.{1}'.format(dyn_obj.filename, fmt.lower() if fmt else 'png'),
+                        format=fmt.lower() if fmt else 'png', dpi=200)
     if pdf:
         pdf.save(fig)
     # plt.close()
-    return
 
 
-def show_sec(sec_obj: computing.Secondary, save=False, pdf: Pdf=None):
+def show_sec(sec_obj: computing.Secondary, save=False, fmt=None, pdf: Pdf=None):
     """
     plots the secondary spectrum to the current figure in matplotlib
     :param sec_obj: "Secondary" object
-    :return:
+    :param save: save image to file
+    :param fmt: format that the matplotlib-backend then uses
+    :param pdf: pdf object
     """
     fig = show_image(sec_obj.get_sec(), sec_obj.get_y_axis(), sec_obj.get_x_axis())
     if sec_obj.made_1D:
@@ -86,10 +98,13 @@ def show_sec(sec_obj: computing.Secondary, save=False, pdf: Pdf=None):
     plt.ylabel('delay')
     plt.xlabel('fringe frequency')
     if save:
-        plt.savefig('{0}_sec.pdf'.format(sec_obj.filename), format='pdf')
+        if pdf and not fmt:
+            fmt = 'pdf'
+        if not pdf:
+            plt.savefig('{0}_sec.{1}'.format(sec_obj.filename, fmt.lower() if fmt else 'png'),
+                        format=fmt.lower() if fmt else 'png', dpi=200)
     if pdf:
         pdf.save(fig)
-    return
 
 
 def overplot_parabolas(sec_obj: computing.Secondary, etas, offsets=None):

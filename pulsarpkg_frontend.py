@@ -32,8 +32,10 @@ def parse_args():
     query.add_argument('--attr-list', action="store_true", help='get a list of available attributes')
     query.add_argument('-d', '--dyn', action="store_true", help='Plot the dynamic spectrum')
     query.add_argument('-s', '--sec', action="store_true", help='Plot the secondary spectrum')
-    query.add_argument('-t', '--store', action="store_true", help='store the images to files')
-    query.add_argument('-p', '--pdf', action="store_true", help='store all of the images in one pdf')
+    query.add_argument('-t', '--store', action="store_true", help='store the images to separate files,\n'
+                                                                  'defaults to .png if --format is not specified')
+    query.add_argument('-p', '--pdf', action="store_true", help='store all of the images in a single pdf file')
+    query.add_argument('-m', '--format', help='format for image saving, i.e. "jpg", "eps"')
     query.add_argument('-wf', '--write-files', action="store_true", help='write the rows from the DB back to the files')
     query.add_argument('--csv', action="store_true", help='Write a csv file')
     query.add_argument('--cmap', help='Choose the colormap from the matplotlib palette, default is "viridis"')
@@ -194,13 +196,13 @@ def main(args):
             # Plotting:
             if args.dyn and not args.sec:  # only plot dynamic
                 dyn = computing.Dynamic(hdulist, header, filename, rotate)
-                plotting.show_dyn(dyn, args.store, pdf)
+                plotting.show_dyn(dyn, args.store, args.format, pdf)
             if args.sec:  # plot dynamic and secondary
                 sec = computing.Secondary(hdulist, header, filename, rotate)
                 if args.dyn:
-                    plotting.show_dyn(sec, args.store, pdf)
-                plotting.show_sec(sec, args.store, pdf)
-            if not args.pdf:  # don't plot to screen when creating a pdf
+                    plotting.show_dyn(sec, args.store, args.format, pdf)
+                plotting.show_sec(sec, args.store, args.format, pdf)
+            if not args.store:  # don't plot to screen when storing images
                 plotting.show()
             # end for-loop
 
