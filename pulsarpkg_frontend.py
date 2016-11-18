@@ -6,10 +6,16 @@ from fitsdb import sqlite
 from arcfinder import computing
 from arcfinder import plotting
 
-import astropy.utils.console
-
 import argparse
 from collections import OrderedDict
+
+try:
+    import astropy.utils.console
+    have_astropy = True
+except ImportError:
+    have_astropy = False
+
+import sys
 
 
 def parse_args():
@@ -99,10 +105,14 @@ def main(args):
         files = sqlite.Files(args.file, args.debug, args.verbose)
     if args.subcmd == 'ingest':
         file_list = db.get_file_list(args.files)
-        with astropy.utils.console.ProgressBarOrSpinner(len(file_list), "Ingesting..") as bar:
-            for i in range(1, len(file_list)):
-                db.ingest_data([file_list[i]])
-                bar.update(i)
+        if have_astropy and len(file_list) > 3:
+            file_list = db.get_file_list(args.files)
+            with astropy.utils.console.ProgressBar(len(file_list)) as bar:
+                for i in range(len(file_list)):
+                    bar.update()
+                    db.ingest_data([file_list[i]])
+        else:
+            db.ingest_data(args.files)
     elif args.subcmd == 'sql':
         for row in db.sql(args.sql):
             print(tuple(row))
@@ -171,7 +181,7 @@ def main(args):
                 filename = header['filename']
                 rotate = True
             elif args.f:
-                hdulist, header, data = files.get_header_data(res)
+                hdulist, header, data = files.get_data(res)
                 filename = res
                 rotate = True if not args.write_files else False
 

@@ -84,7 +84,6 @@ class Dynamic:
         :param rotate: rotate when handling local fits files
         """
         functions.check_object_type(data, fits.HDUList)
-        functions.check_object_type(db_header, dict)
 
         self.hdu_header = data[0].header
         self.db_header = db_header
@@ -319,10 +318,8 @@ class Secondary(Dynamic):  # Secondary inherits the Dynamic class
         :param hand:
         :return:
         """
-        if not isinstance(data, fits.HDUList):
-            TypeError('data is not a HDUList')
-        if not isinstance(db_header, dict):
-            TypeError('db_header is not a dict')
+        functions.check_object_type(data, fits.HDUList)
+
         Dynamic.__init__(self, data, db_header, filename, rotate)
         data = self.get_secondary_spectrum()
         axes = self.get_sec_axes()

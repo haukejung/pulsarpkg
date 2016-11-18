@@ -71,7 +71,7 @@ def show_dyn(dyn_obj, save=False, fmt=None, pdf=None):
     :param pdf: pdf object
     """
     functions.check_object_type(dyn_obj, computing.Dynamic)
-    functions.check_object_type(pdf, Pdf)
+    functions.check_object_type(pdf, Pdf, allowNone=True)
 
     fig = show_image(dyn_obj.dyn, dyn_obj.get_dyn_y_axis(), dyn_obj.get_dyn_x_axis())
     plt.title(dyn_obj.filename)
@@ -97,7 +97,8 @@ def show_sec(sec_obj, save=False, fmt=None, pdf=None):
     :param pdf: pdf object
     """
     functions.check_object_type(sec_obj, computing.Secondary)
-    functions.check_object_type(pdf, Pdf)
+    functions.check_object_type(pdf, Pdf, allowNone=True)
+
     fig = show_image(sec_obj.get_sec(), sec_obj.get_y_axis(), sec_obj.get_x_axis())
     if sec_obj.made_1D:
         overplot_parabolas(sec_obj, [min(sec_obj.etas), max(sec_obj.etas)])

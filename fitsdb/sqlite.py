@@ -7,6 +7,30 @@ import sqlite3
 import glob
 import numpy as np
 import warnings
+import io
+
+
+def adapt_array(arr):
+    """
+    Converts an array to bytes
+    :param arr: The array to convert
+    :return: The sqlite3 binary
+    """
+    out = io.BytesIO()
+    np.save(out, arr)
+    out.seek(0)
+    return sqlite3.Binary(out.read())
+
+
+def convert_array(text):
+    """
+    Convert bytes to numpy array
+    :param text: binary text
+    :return: numpy array
+    """
+    out = io.BytesIO(text)
+    out.seek(0)
+    return np.load(out)
 
 
 class Files:
@@ -14,16 +38,33 @@ class Files:
     Files class for accessing fits files directly
     """
     def import_fits(self):
-        if not self.imported:
-            import astropy.io.fits as fits
-            self.fits = fits
-            self.imported = True
+        if not self.imported_fits:
+            try:
+                import astropy.io.fits as fits
+                self.fits = fits
+                self.imported_fits = True
+            except ImportError:
+                print('For this type of action, the python package "astropy" is needed.')
+                exit(1)
+
+    def import_psrchive(self):
+        if not self.imported_psrchive:
+            try:
+                import psrchive
+                self.psrchive = psrchive
+                self.imported_psrchive = True
+            except ImportError:
+                print('For this type of action, psrchive must be installed, and the python interface available.\n'
+                      'PSRchive also only works with python2')
+                exit(1)
 
     def __init__(self, file, debug=False, verbose=False):
         self.file = file[0]
         self.debug = debug
-        self.imported = False
+        self.imported_fits = False
+        self.imported_psrchive = False
         self.fits = None
+        self.psrchive = None
         self.files = self.get_file_list(file)
         self.verbose = verbose
         if not debug:
@@ -44,9 +85,9 @@ class Files:
         # assert file_list != [], 'No files found.'
         return file_list
 
-    def get_header_data(self, filename):
+    def get_data_fits(self, filename):
         """
-        Get the header information and data of the provided file.
+        Get the header information and data of the provided fits-file.
         :param filename:
         """
         self.import_fits()
@@ -59,6 +100,96 @@ class Files:
         hdulist[0].header = header
         hdulist[0].data = astrodata
         # hdulist.close()
+        return hdulist, header, astrodata
+
+    def get_data_ar(self, filename):
+        """
+        Get the header information and data of the provided psrchive-file. Converts the data to a dynamic spectrum
+        :param filename:
+        """
+        self.import_fits()
+        self.import_psrchive()
+        ar = self.psrchive.Archive_load(filename)
+        ar.pscrunch()
+        dedispersed = ar.get_dedispersed()
+        if not dedispersed:  # dedisperse the data if it's not already
+            ar.dedisperse()
+
+        ar.remove_baseline()
+        ar.get_filename()
+
+        # Get metadata
+        backend = ar.get_backend_name()
+        freq = ar.get_centre_frequency()
+        bw = ar.get_bandwidth()
+        nbin = ar.get_nbin()
+        nchan = ar.get_nchan()
+        nsubint = ar.get_nsubint()
+        int_len = ar.integration_length()
+        source = ar.get_source()
+        origin = ar.get_telescope()
+        mjd = ar.get_Integration(0).get_start_time().in_days()
+        dm = ar.get_dispersion_measure()
+
+        # Using the ProfileShiftFit class to compute the SNR for every subint/channel
+        # (analogous to the dynamic_spectra.C code)
+        prof_shift = self.psrchive.ProfileShiftFit()
+        prof_shift.choose_maximum_harmonic = True
+        tot = ar.total()
+        tot_prof = tot.get_Profile(0, 0, 0)
+        prof_shift.set_standard(tot_prof)
+
+        dyn = np.empty(shape=[nsubint, nchan])
+        for i in range(nsubint):
+            for j in range(nchan):
+                profile = ar.get_Profile(i, 0, j)
+                prof_shift.set_Profile(profile)
+                dyn[i, j] = prof_shift.get_snr()*profile.get_weight()
+
+        header = {'FREQ': freq, 'BW': bw, 'NCHAN': nchan, 'NSUB': nsubint, 'T_INT': int_len, 'SOURCE': source,
+                  'ORIGIN': origin, 'MJD': mjd, 'NAXIS': 2, 'NAXIS1': len(dyn[0]), 'NAXIS2': len(dyn), 'BITPIX': 32, 'DM': dm}
+
+        fits_header = self.fits.Header()  # prepare FITS header
+        for key in header:
+            # print(key)
+            fits_header.extend([(str(key), header[key])])
+
+        hdulist = self.fits.HDUList()  # start creating the new HDU list
+        imagehdu = self.fits.ImageHDU(data=dyn, header=fits_header)
+        hdulist.append(imagehdu)
+
+        hdulist.writeto(filename[:filename.rfind('.')]+".fits", output_verify='fix')  # writes the file back to a file
+        # and changes existing extension to .fits
+
+        return hdulist, header, dyn
+
+    def get_data(self, file):
+        ext = os.path.splitext(file)[1]
+        hdulist, header, astrodata = None, None, None
+        if ext in ['.fit', '.fits']:
+            try:
+                hdulist, header, astrodata = self.get_data_fits(file)
+            except OSError:
+                print('{0} is not a FITS file'.format(file))
+                exit(1)
+        elif ext in ['.ar']:
+            hdulist, header, astrodata = self.get_data_ar(file)
+            # try:
+            #     hdulist, header, astrodata = self.get_data_ar(file)
+            # except Exception:
+            #     print('File is not in psrchive format')
+            #     exit(1)
+        else:
+            print('Testing if it\'s a pulsar archive..')
+            hdulist, header, astrodata = self.get_data_ar(file)
+            # try:
+            #     print('Testing if it\'s a pulsar archive..')
+            #     hdulist, header, astrodata = self.get_data_ar(file)
+            # except Exception:
+            #     print('File is neither in FITS nor in psrchive format')
+            #     exit(1)
+        # del(header[""])     # removing all empty headers
+        # print('header', header)
         return hdulist, header, astrodata
 
     def fix_header(self, header):
@@ -191,9 +322,9 @@ class DB(Files):
         self.fraction = 0
         for file in files:
             header_id = self.get_id(file)     # will be [] if file is not found in the DB
-            hdulist, header, astrodata = self.get_header_data(file)
-            # del(header[""])     # removing all empty headers
-            # print('header', header)
+
+            hdulist, header, astrodata = self.get_data(file)
+
             self.check_columns(header.keys())
             if not header_id:  # file not in the database yet
                 # INSERT
@@ -222,7 +353,7 @@ class DB(Files):
                 # command = 'INSERT INTO astrodata (headers_id, dim1, dim2, DATA) VALUES (?, ?, ?, ?)'
                 # self.cursor.execute(command, (self.cursor.lastrowid, len(astrodata), len(astrodata[0]), astrodata))
                 command = 'INSERT INTO astrodata (headers_id, DATA) VALUES (?, ?)'
-                self.cursor.execute(command, (self.cursor.lastrowid, astrodata))
+                self.cursor.execute(command, (self.cursor.lastrowid, adapt_array(astrodata)))
                 self.conn.commit()
             else:
                 # UPDATE
@@ -236,12 +367,11 @@ class DB(Files):
                 # command = 'UPDATE astrodata SET dim1 = ?, dim2 = ?, DATA = ? WHERE headers_id = ?'
                 # self.cursor.execute(command, (astrodata, len(astrodata), len(astrodata[0]), str(header_id[0][0])))
                 command = 'UPDATE astrodata SET DATA = ? WHERE headers_id = ?'
-                self.cursor.execute(command, (astrodata, str(header_id[0][0])))
+                self.cursor.execute(command, (adapt_array(astrodata), str(header_id[0][0])))
                 self.conn.commit()
             self.fraction += 1/len(files)
             if self.verbose:
                 print('\r{0}%'.format(self.report_percentage()), end='')
-        print("")
 
     def extract(self, attributes, writetofile=False):
         """
@@ -324,21 +454,25 @@ class DB(Files):
             header.extend([(key, row[key])])
         hdulist = self.fits.HDUList()  # start creating the new HDU list
 
-        dtype = np.float32 if row["BITPIX"] == -32 else np.float64  # BITPIX shows if floats are 32 or 64 bit long
-        data = np.fromstring(row["DATA"], dtype=dtype)
-        if row["BITPIX"] == -32:
-            data = data.byteswap()  # change endianness only if 32-bit floats
-        if len(data) == row["NAXIS1"]*row["NAXIS2"]:
-            data = data.reshape((row["NAXIS2"], row["NAXIS1"]))  # recreate the 2D matrix from the 1D array
-        else:
-            print("The NAXIS parameters don't match the data (%i <> %i)."
-                  % (len(data), row["NAXIS2"]*row["NAXIS1"]))
+        data = convert_array(row["DATA"])  # , dtype=dtype)
+        # dtype = np.float32 if row["BITPIX"] == -32 else np.float64  # BITPIX shows if floats are 32 or 64 bit long
+        # if row["BITPIX"] == -32:
+        #     data = data.byteswap()  # change endianness only if 32-bit floats
+        # if len(data) == row["NAXIS1"]*row["NAXIS2"]:
+        #     data = data.reshape((row["NAXIS2"], row["NAXIS1"]))  # recreate the 2D matrix from the 1D array
+        if len(data)*len(data[0]) != row["NAXIS1"]*row["NAXIS2"]:
+            print("The NAXIS parameters don't match the data ({0}, {1} <> {2}, {3}).".format(
+                    len(data), len(data[0]), row["NAXIS2"]*row["NAXIS1"]))
             return hdulist  # return the empty list to not abort the program
 
         imagehdu = self.fits.ImageHDU(data=data, header=header)
         hdulist.append(imagehdu)
         if writetofile:
-            hdulist.writeto(row["filename"], output_verify='fix')  # writes the hdulist back to a FITS-file
+            filename = row["filename"]
+            ext = os.path.splitext(filename)[1]
+            if ext not in ['.fit', '.fits']:
+                filename += '.fits'
+            hdulist.writeto(filename, output_verify='fix')  # writes the hdulist back to a FITS-file
 
         return hdulist
 
