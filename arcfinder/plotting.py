@@ -37,15 +37,18 @@ class Pdf:
         self.pdfp.close()
 
 
-def show_image(showme, axis_y=None, axis_x=None):
+def show_image(showme, axis_y=None, axis_x=None, colormap=cmap):
     """
     Shows an image with the given X and Y axes.
     :param showme: the 2D array to be shown
     :param axis_y: a 1D array containing the y axis to be used in the plot.
     :param axis_x: a 1D array containing the x axis to be used in the plot.
-    :param cmap: matplotlib colormap
+    :param colormap: matplotlib colormap
     :return:
     """
+    if colormap not in plt.colormaps():  # use default cmap if default colormap is not found
+        # (None falls back to matplotlib's default)
+        colormap = None
     if axis_x is None:
         axis_x = [i for i in range(len(showme[0]))]
     if axis_y is None:
@@ -53,7 +56,7 @@ def show_image(showme, axis_y=None, axis_x=None):
     (x_min, x_max) = (min(axis_x), max(axis_x))
     (y_min, y_max) = (min(axis_y), max(axis_y))
     fig = plt.figure()
-    plt.imshow(showme, aspect='auto', extent=[x_min, x_max, y_min, y_max], cmap=cmap)
+    plt.imshow(showme, aspect='auto', extent=[x_min, x_max, y_min, y_max], cmap=colormap)
     plt.colorbar()
     return fig
 
