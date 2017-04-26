@@ -15,41 +15,60 @@ try:
 except ImportError:
     have_astropy = False
 
-import sys
-
 
 def parse_args():
     """
     Parse the command line arguments.
     """
+    # criteria for selecting DB entries. Will be needed in query and plot sub-command
+    # structure for each element: {args, kwargs}
+    select = [
+        [["--filename"],    {"help": 'filename'}],
+        [["--pulsar"],      {"help": 'Pulsar name'}],
+        [["--mjd"],         {"help": 'MJD-range in the form of "51000 52000"'}],
+        [["--freq"],        {"help": 'Frequency bandwidth (MHz) in the form of "300 400"'}],
+        [["-a", "--attr"],  {"help": 'select another attribute, e.g. --attr ORIGIN "Arecibo" or'
+                                     ' --attr MJD "51000 52000"',
+                             "nargs": 2}],
+        [["--attr-list"],   {"help": 'get a list of available attributes',
+                             "action": "store_true"}]
+        ]
+
     parser = argparse.ArgumentParser(
             description='Inserts FITS header information in a SQLite database.')
     subparsers = parser.add_subparsers()
+
     ingest = subparsers.add_parser('ingest', help='ingest files')
     ingest.set_defaults(subcmd='ingest')
     ingest.add_argument('files', help='filenames, e.g. "dir/*.fits"', nargs='+')
+
     sql = subparsers.add_parser('sql', help='SQL-Statement to query, e.g. "SELECT * FROM headers")')
     sql.set_defaults(subcmd='sql')
+
     query = subparsers.add_parser('query', help='Query the database')
     query.set_defaults(subcmd='query')
-    query.add_argument('--filename', help='filename')
-    query.add_argument('--pulsar', help='Full pulsar name')
-    query.add_argument('--mjd', help='MJD-range in the form of "51000 52000"')
-    query.add_argument('--freq', help='Frequency bandwidth (MHz) in the form of "300 400"')
-    query.add_argument('-a', '--attr', help='other attribute, e.g. --attr "T_INT"', nargs='+')
-    query.add_argument('-r', '--attr-value', help='attribute value or range (see --mjd)', nargs='+')
-    query.add_argument('--attr-list', action="store_true", help='get a list of available attributes')
-    query.add_argument('-d', '--dyn', action="store_true", help='Plot the dynamic spectrum')
-    query.add_argument('-s', '--sec', action="store_true", help='Plot the secondary spectrum')
-    query.add_argument('-t', '--store', action="store_true", help='store the images to separate files,\n'
-                                                                  'defaults to .png if --format is not specified')
-    query.add_argument('-p', '--pdf', action="store_true", help='store all of the images in a single pdf file')
-    query.add_argument('-m', '--format', help='format for image saving, i.e. "jpg", "eps"')
-    query.add_argument('-wf', '--write-files', action="store_true", help='write the rows from the DB back to the files')
+    for s in select:
+        query.add_argument(*s[0], **s[1])  # give the arguments as normal args and the named arguments as kwargs
     query.add_argument('--csv', action="store_true", help='Write a csv file')
-    query.add_argument('--cmap', help='Choose the colormap from the matplotlib palette, default is "viridis"')
     query.add_argument('-e', '--delete', action="store_true", help='Delete the entries that match the query\n'
                                                                    'DOESN\'T ASK FOR CONFIRMATION')
+    query.add_argument('-w', '--write-files', action="store_true", help='write the rows from the DB back to the files')
+
+    plot = subparsers.add_parser('plot', help='Plot a spectrum')
+    plot.set_defaults(subcmd='plot')
+    for s in select:
+        plot.add_argument(*s[0], **s[1])  # give the arguments as normal args and the named arguments as kwargs
+    plot.add_argument('-d', '--dyn', action="store_true", help='Plot the dynamic spectrum')
+    plot.add_argument('-s', '--sec', action="store_true", help='Plot the secondary spectrum')
+    plot.add_argument('-t', '--store', action="store_true", help='store the images to separate files,\n'
+                                                                 'defaults to .png if --format is not specified')
+    plot.add_argument('--pdf', action="store_true", help='store all of the images in a single pdf file')
+    plot.add_argument('-m', '--format', help='format for image saving, i.e. "jpg", "eps", or for text output:'
+                                             '"matrix" (with separate file for axes) or "gnuplot"')
+    plot.add_argument('--cmap', help='Choose the colormap from the matplotlib palette, default is "viridis"')
+    plot.add_argument('-w', '--write-files', action="store_true", help='write the rows from the DB back to the files')
+    # query.add_argument('--parabola', action="store_true", help='parabola fitting of the secondary spectrum')
+    # query.add_argument('--maxt', help='maximum thickness of the parabola (default: 5)')
 
     positional = parser.add_mutually_exclusive_group(required='True')
     positional.add_argument('-b', '--db', action="store_true", help='switch for using a sqlite database')
@@ -82,14 +101,70 @@ def create_attr_dict(args, outp, stdlength=10):
         attr_dict["FREQ"] = args.freq
 
     # add output attributes if specified
-    if args.attr and args.attr_value:
-        for a, v in zip(args.attr, args.attr_value):
-            a = a.strip('\'\"')
-            v = v.strip('\'\"')
-            attr_dict[a] = v
+    if args.attr:
+        for a in args.attr:
+            if len(a) != 2:
+                raise argparse.ArgumentError('Need two arguments for each -a|--attr')
+            attr = a[0].strip('\'\"')
+            value = a[1].strip('\'\"')
+            attr_dict[attr] = value
             if a not in outp.keys():
                 outp[a] = stdlength  # std length for attributes is 10
     return attr_dict
+
+
+def get_data(db, files, args):
+    if args.attr_list:
+        attrs = db.get_columns()
+        print("List of available attributes:")
+        for attr in attrs:
+            print(attr)
+        exit(0)
+
+    outp = OrderedDict()  # consists of the output columns and their corresponding widths
+    if not args.f:
+        outp['id'] = 4
+        outp['filename'] = 30
+        outp['ORIGIN'] = 23
+        outp['MJD'] = 18
+        outp['FREQ'] = 12
+        outp['BW'] = 10
+
+    attr_dict = create_attr_dict(args, outp)
+    if args.debug:
+        print('attr_dict', attr_dict)
+
+    result = []
+    if args.db:
+        result = db.extract(attr_dict, args.write_files)
+    elif args.f:
+        result = files.files
+
+    type = 'rows' if args.db else 'files'
+    print("Found {0} matching {1}\n".format(len(result), type))
+
+    if len(result) < 1:
+        exit(0)  # nothing to do
+    else:  # create list header for console output
+        text, hline = '', ''
+        for key, value in outp.items():
+            text += ' {0:{1}} |'.format(key, value)
+            hline += '{0}|'.format('-'*(value+2))  # makes the hline under the header; +2 for the two spaces
+        print(text[:-2])  # remove the last "\t|"
+        print(hline[:-1])  # remove the last "|"
+
+    return outp, attr_dict, result
+
+
+def tabular_output(args, filename, outp, header):
+    text = ''
+    if args.f:
+        text += ' {0:{1}} |'.format(filename, outp['filename'])
+    for key, value in outp.items():
+        if args.f and key == 'filename':
+            continue
+        text += ' {0:{1}} |'.format(header[key], value)
+    print(text[:-2])  # remove the last " |"
 
 
 def main(args):
@@ -97,8 +172,8 @@ def main(args):
     The main controller.
     :param args: arguments provided by the commandline
     """
-
     db = None
+    files = None
     if args.db:
         db = sqlite.DB(args.file, args.debug, args.verbose)
     elif args.f:
@@ -117,65 +192,15 @@ def main(args):
         for row in db.sql(args.sql):
             print(tuple(row))
     elif args.subcmd == 'query':
-        if args.cmap:
-            plotting.cmap = args.cmap
-
-        if args.attr_list:
-            attrs = db.get_columns()
-            print("List of available attributes:")
-            for attr in attrs:
-                print(attr)
-            exit(0)
-
-        # outp = OrderedDict(id=4, filename=30, ORIGIN=23, MJD=18, FREQ=12, BW=10)
-        outp = OrderedDict()  # consists of the output columns and their corresponding widths
-        if not args.f:
-            outp['id'] = 4
-        outp['filename'] = 30
-        outp['ORIGIN'] = 23
-        outp['MJD'] = 18
-        outp['FREQ'] = 12
-        outp['BW'] = 10
-
-        attr_dict = create_attr_dict(args, outp)
-        if args.debug:
-            print('attr_dict', attr_dict)
-
-        if args.db:
-            result = db.extract(attr_dict, args.write_files)
-        elif args.f:
-            result = files.files
-            pass
-        else:
-            result = []
-        type = 'rows' if args.db else 'files'
-        print("Found {0} matching {1}\n".format(len(result), type))
-
-        if len(result) < 1:
-            exit(0)  # nothing to do
-        else:  # create list header for console output
-            text, hline = '', ''
-            for key, value in outp.items():
-                text += ' {0:{1}} |'.format(key, value)
-                hline += '{0}|'.format('-'*(value+2))  # makes the hline under the header; +2 for the two spaces
-            print(text[:-2])  # remove the last "\t|"
-            print(hline[:-1])  # remove the last "|"
-
-        csv = ''
-
-        all_keys = []  # gather headers of files for csv in there
-        if args.f:
-            all_keys.append("filename")
-        pdf = None
-        if args.pdf:
-            pdf = plotting.Pdf(attr_dict)
-
+        outp, attr_dict, result = get_data(db, files, args)
         delete_ids = []
+        all_keys = []
+        csv = ''
+        filename = ''
         for res in result:
             if args.db:
                 if args.delete:
                     delete_ids.append(res[1]["id"])
-                rotate = False
                 hdulist = res[0]
                 header = res[1]
                 filename = header['filename']
@@ -201,26 +226,7 @@ def main(args):
                     csv += '\n'
 
             # text output
-            text = ''
-            if args.f:
-                text += ' {0:{1}} |'.format(filename, outp['filename'])
-            for key, value in outp.items():
-                if args.f and key == 'filename':
-                    continue
-                text += ' {0:{1}} |'.format(header[key], value)
-            print(text[:-2])  # remove the last " |"
-
-            # Plotting:
-            if args.dyn and not args.sec:  # only plot dynamic
-                dyn = computing.Dynamic(hdulist, header, filename, rotate)
-                plotting.show_dyn(dyn, args.store, args.format, pdf)
-            if args.sec:  # plot dynamic and secondary
-                sec = computing.Secondary(hdulist, header, filename, rotate)
-                if args.dyn:
-                    plotting.show_dyn(sec, args.store, args.format, pdf)
-                plotting.show_sec(sec, args.store, args.format, pdf)
-            if not args.store:  # don't plot to screen when storing images
-                plotting.show()
+            tabular_output(args, filename, outp, header)
             # end for-loop
 
         if args.delete:
@@ -244,10 +250,45 @@ def main(args):
             name += '_{0}.csv'.format(plotting.datenow)
             with open(name, 'w') as f:
                 f.write(csv_head+csv)
+    elif args.subcmd == 'plot':
+        if args.cmap:
+            plotting.cmap = args.cmap
+
+        outp, attr_dict, result = get_data(db, files, args)
+
+        pdf = None
+        if args.pdf:
+            pdf = plotting.Pdf(attr_dict)
+        for res in result:
+            if args.db:
+                hdulist = res[0]
+                header = res[1]
+                filename = header['filename']
+                rotate = True
+            elif args.f:
+                hdulist, header, data = files.get_data(res)
+                filename = res
+                rotate = True if not args.write_files else False
+
+            # text output
+            tabular_output(args, filename, outp, header)
+
+            # Plotting:
+            if args.dyn and not args.sec:  # only plot dynamic
+                dyn = computing.Dynamic(hdulist, header, filename, rotate)
+                plotting.show_dyn(dyn, args.store, args.format, pdf)
+            elif args.sec:
+                sec = computing.Secondary(hdulist, header, filename, rotate)
+                if args.dyn:  # plot dynamic first
+                    plotting.show_dyn(sec, args.store, args.format, pdf)
+                plotting.show_sec(sec, args.store, args.format, pdf)
+            else:
+                raise argparse.ArgumentError('plot', 'Unrecognized plot type')
+            if not args.store:  # don't plot to screen when storing images
+                plotting.show()
+            # end for-loop
 
 
 if __name__ == '__main__':
     args = parse_args()
     main(args)
-
-

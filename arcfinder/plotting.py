@@ -6,6 +6,12 @@ from time import strftime
 
 import functions
 
+try:
+    import astropy.utils.console
+
+    have_astropy = True
+except ImportError:
+    have_astropy = False
 
 cmap = 'viridis'  # set default colormap
 datenow = strftime("%Y-%m-%d_%H-%M-%S")
@@ -24,7 +30,7 @@ class Pdf:
             title = title[:-2]
             title += ')'
 
-        self.pdfp = PdfPages(name+'_{0}.pdf'.format(datenow))
+        self.pdfp = PdfPages(name + '_{0}.pdf'.format(datenow))
         self.info = self.pdfp.infodict()
 
         self.info['Title'] = title
@@ -65,13 +71,52 @@ def show():
     plt.show()
 
 
-def show_dyn(dyn_obj, save=False, fmt=None, pdf=None):
+def write_fig(type, obj, fmt, pdf, dpi, bar, freq, time):
+    if fmt == 'matrix':
+        with open('{0}_{1}_matrix.{2}'.format(obj.filename, type, 'txt'), 'w') as f:
+            for row in (obj.dyn if type == 'dyn' else obj.get_sec()):
+                f.write(' '.join(str(elem) for elem in row) + '\n')  # writes all elements, separated with spaces
+                if bar:
+                    bar.update()
+        with open('{0}_{1}_matrix_axes.{2}'.format(obj.filename, type, 'txt'), 'w') as f:
+            f.write(' '.join(str(f) for f in freq) + '\n')
+            f.write(' '.join(str(t) for t in time))
+    elif fmt == 'gnuplot':
+        with open('{0}_{1}_gnuplot.{2}'.format(obj.filename, type, 'txt'), 'w') as f:
+            ax2, ax1 = obj.get_dyn_axes() if type == 'dyn' else obj.get_sec_axes()
+            for yi in range(len(ax2)):
+                for xi in range(len(ax1)):
+                    # f.write('{0}\t{1}\t{2}\n'.format(str(ax1[xi]), str(ax2[yi]),
+                    f.write('{0}\t{1}\t{2}\n'.format(xi, yi,
+                                                     str(obj.dyn[yi][xi]) if type == 'dyn'
+                                                     else str(obj.get_sec()[yi][xi])))
+                if bar:
+                    bar.update()
+    else:
+        plt.savefig('{0}_dyn.{1}'.format(obj.filename, fmt.lower()),
+                    format=fmt.lower() if fmt else 'png', dpi=dpi)
+
+
+def save_fig(type, obj, fmt, pdf, dpi):
+    if pdf and not fmt:
+        fmt = 'pdf'
+    if fmt and not pdf:
+        freq, time = obj.get_dyn_axes() if type == 'dyn' else obj.get_sec_axes()
+        if have_astropy:
+            with astropy.utils.console.ProgressBar(len(freq)) as bar:
+                write_fig(type, obj, fmt, pdf, dpi, bar, freq, time)
+        else:
+            write_fig(type, obj, fmt, pdf, dpi, False, freq, time)
+
+
+def show_dyn(dyn_obj, save=False, fmt='png', pdf=None, dpi=200):
     """
     plots the dynamic spectrum to the current figure in matplotlib
     :param dyn_obj: "Dynamic" object
     :param save: save image to file
     :param fmt: format that the matplotlib-backend then uses
     :param pdf: pdf object
+    :param dpi: DPI value
     """
     functions.check_object_type(dyn_obj, computing.Dynamic)
     functions.check_object_type(pdf, Pdf, allowNone=True)
@@ -81,17 +126,13 @@ def show_dyn(dyn_obj, save=False, fmt=None, pdf=None):
     plt.xlabel('Time (MJD - {0}) [s]'.format(dyn_obj.hdu_header['MJD']))
     plt.ylabel('Frequency [MHz]')
     if save:
-        if pdf and not fmt:
-            fmt = 'pdf'
-        if not pdf:
-            plt.savefig('{0}_dyn.{1}'.format(dyn_obj.filename, fmt.lower() if fmt else 'png'),
-                        format=fmt.lower() if fmt else 'png', dpi=200)
+        save_fig('dyn', dyn_obj, fmt, pdf, dpi)
     if pdf:
         pdf.save(fig)
-    # plt.close()
+        # plt.close()
 
 
-def show_sec(sec_obj, save=False, fmt=None, pdf=None):
+def show_sec(sec_obj, save=False, fmt=None, pdf=None, dpi=200):
     """
     plots the secondary spectrum to the current figure in matplotlib
     :param sec_obj: "Secondary" object
@@ -109,11 +150,7 @@ def show_sec(sec_obj, save=False, fmt=None, pdf=None):
     plt.ylabel('delay')
     plt.xlabel('fringe frequency')
     if save:
-        if pdf and not fmt:
-            fmt = 'pdf'
-        if not pdf:
-            plt.savefig('{0}_sec.{1}'.format(sec_obj.filename, fmt.lower() if fmt else 'png'),
-                        format=fmt.lower() if fmt else 'png', dpi=200)
+        save_fig('sec', sec_obj, fmt, pdf, dpi)
     if pdf:
         pdf.save(fig)
 

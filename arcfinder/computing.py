@@ -413,7 +413,7 @@ class Secondary(Dynamic):  # Secondary inherits the Dynamic class
         nyq_t = 1000. / (2. * t_int)  # nyquist frequency for the delay axis of the secondary spectrum
         nyq_f = nchans / (2. * BW)  # nyquist frequency for the fringe frequency axis of the secondary spectrum
         fringe = list(np.linspace(-nyq_t, nyq_t, naxis2))
-        delay = list(reversed(-1. * np.linspace(0, nyq_f, nchans / 2)))
+        delay = list(reversed(np.linspace(0, nyq_f, nchans / 2.)))
         return delay, fringe
 
     def get(self, value):
@@ -468,144 +468,58 @@ class Secondary(Dynamic):  # Secondary inherits the Dynamic class
         """
         return self.sec.get_data()
 
-    @staticmethod
-    def __give_eta_list(eta_range, num_etas, decimal_places=4):
-        if num_etas is not 1:
-            x_max = np.sqrt(1 / min(eta_range))
-            x_min = np.sqrt(1 / max(eta_range))
-            return [1 / x ** 2 for x in np.linspace(x_min, x_max, num_etas)]
-        else:
-            return [np.average(eta_range)]
 
-    def make_1D_by_quadratic(self, eta_range, num_etas, num_threads=mp.cpu_count() - 1, sigma=None):
+def distparab(x, y, a):  # Calculate distance away from parabola
+    x = -abs(x)
+    A = 1.0/(2.0*a*a) - y/a
+    B = -x/(2.0*a*a)
+    xp, _r2, _r3 = np.roots([1.0, 0.0, A, B])  # problem can be reduced to solving this equation: x^3+Ax+B=0
+    yp = a*pow(xp, 2)
+    dx = xp - x
+    dy = yp - y
+    return dx, dy
+
+
+class Parabola:
+    def __init__(self, secondary, xrange, yrange, mask, max_t):
         """
-        finds the eta values of the parabolas in the secondary spectrum.
-        goes through the range of etas given to it, and determines the total power integrated
-        across the parabola defined by each eta. Since the parabolas are blurred out, we expect
-        to see a gaussian distribution in eta vs power.
-        :param eta_range: a tuple containing the minimum and maximum etas to explore
-        :param num_etas: the number of etas to explore over the above range
-        :param num_threads: the number of simultaneous processes to be used for multiprocessing
-        :param sigma: idfk i forget, just leave it alone probably
-        :return: a list of powers and their corresponding eta values. Returned in the form (etas,values)
-        where both etas and values are lists.
+        :param secondary: a secondary object
+        :param xrange: range of x-values to consider (x_min, x_max) [mHz]
+        :param yrange: range of y-values to consider (y_min, y_max) [us]
+        :param mask: data points <= than this many pixels from origin/x-axis/y-axis will be masked
+        :param max_t: max parabola thickness
         """
-        if num_threads == 0:
-            num_threads = 1
-        # print("num threads: " + str(num_threads))
-        # print(self.observation_name)
+        functions.check_object_type(secondary, Secondary)
 
-        etas = self.__give_eta_list(eta_range, num_etas)
+        self.sec = secondary
+        self.sec_axes = self.sec.get_axes()
+        self.sec_arr = self.sec.get_data()
+        self.y_orig, self.x_orig = np.shape(self.sec_arr)  # get dimensions from the secondary array
+        self.dy = abs(self.sec_axes[0][1]-self.sec_axes[0][0])  # sec_axes[0] is the delay/y-axis
+        self.dx = abs(self.sec_axes[1][0][1]-self.sec_axes[1][0][0])
+        # If specified x and y limits are outside of actual data, trim them to fit actual data
+        self.min_x = xrange[0] if xrange[0] >= min(self.sec_axes[1]) else min(self.sec_axes[1])
+        self.max_x = xrange[1] if xrange[1] <= max(self.sec_axes[1]) else max(self.sec_axes[1])
+        self.min_y = yrange[0] if yrange[0] >= min(self.sec_axes[0]) else min(self.sec_axes[0])
+        self.max_y = yrange[1] if yrange[1] <= max(self.sec_axes[0]) else max(self.sec_axes[0])
+        self.mask_o, self.mask_x, self.mask_y = mask
+        self.max_t = max_t
 
-        pool = mp.Pool(processes=num_threads)
-        output = pool.map(partial(crunchy, sec=self, hand=self.hand, sigma=sigma), etas)
+        # Check: min_y >= 0
+        if self.min_y < 0.0:
+            self.min_y = 0.0
+            raise ValueError("Minimum y value is lower than 0")
 
-        powers = {}
-        for item in output:
-            powers[item[0]] = item[1]
+        # Check that max's are more than min's
+        if self.max_x < self.min_x or self.max_y < self.min_y:
+            raise ValueError("Minimum values cannot be greater than maximum values")
 
-        ret = sort_dict_by_key(powers)
-        self.made_1D = True
-        self.etas = ret[0]
-        self.powers = ret[1]
-        return ret
+        # Convert mask_o to an ellipse with correct units
+        self.mask_ox = self.mask_o * self.dx
+        self.mask_oy = self.mask_o * self.dy
 
-    # not fully debugged, use with caution #
-    def power_along_parabola(self, eta, num_arclets=100, num_threads=mp.cpu_count() - 1, sigma_px=3):
-        """
-        finds the power along a parabola as a function of x. For instance, if all of the power in
-        a parabola is on the left side of the parabola and there is almost no power on the right side,
-        this function will show large values for x<0 and small values for x>0.
-        :param eta:
-        :param num_arclets:
-        :param num_threads:
-        :param sigma_px:
-        :return:
-        """
-        if num_threads == 0:
-            num_threads = 1
-        # print("num threads: " + str(num_threads))
-        eta = float(eta)
-        max_x = np.sqrt(max(self.sec.get_y_axis()) / eta)
-        max_possible_x = np.absolute(max(self.sec.get_x_axis()))
-        if max_x > max_possible_x:
-            max_x = max_possible_x
+        # Round mask to pixel boundary
+        self.mask_x = np.floor(self.mask_x) + 0.5
+        self.mask_y = np.floor(self.mask_y) + 0.5
 
-        y_axis = self.get_y_axis()
-        x_axis = self.get_x_axis()
-
-        px_y = np.absolute(y_axis[1] - y_axis[0])
-        px_x = np.absolute(x_axis[1] - x_axis[0])
-
-        # def dist_bw_pts(pt1, pt2):
-        #     y1 = pt1[0]
-        #     y2 = pt2[0]
-        #     x1 = pt1[1]
-        #     x2 = pt2[1]
-        #     return np.sqrt(np.absolute(y1 - y2) ** 2 + np.absolute(x1 - x2) ** 2)
-
-        temp = [max_x * x ** 2 for x in np.linspace(0, 1, num_arclets / 2)]
-        x_list = [-x for x in list(reversed(temp))[:-1]]
-        x_list.extend(temp)
-        y_list = [eta * x ** 2 for x in x_list]
-        pts = [(y_list[i], x_list[i]) for i in range(len(x_list))]
-
-        sigmas = []
-        for i in range(len(pts)):
-            if i == 0:
-                sigmas.append([np.absolute(pts[1][0] - pts[0][0]), np.absolute(pts[1][1] - pts[0][1])])
-            elif i == len(pts) - 1:
-                sigmas.append([np.absolute(pts[-1][0] - pts[-2][0]), np.absolute(pts[-1][1] - pts[-2][1])])
-            else:
-                sigma_y = px_y * sigma_px
-                sigma_x = px_x * sigma_px
-                sigmas.append([sigma_y, sigma_x])
-
-        pts_and_sigmas = []
-        for i in range(len(sigmas)):
-            pts_and_sigmas.append((pts[i], sigmas[i]))
-
-        pool = mp.Pool(processes=num_threads)
-        output = pool.map(partial(crunchy2, sec=self, hand=self.hand), pts_and_sigmas)
-
-        powers = {}
-        for item in output:
-            powers[item[0]] = item[1]
-
-        self.parabola_power[eta] = powers
-        return powers
-
-    # not fully debugged, use with caution #
-    def parabola_width(self, eta, max_width, num_offsets, num_threads=mp.cpu_count() - 1):
-        """
-        finds and returns the width of the parabola as a function of x or something.
-        IDK I'm kind of in a rush right now, just contact me somehow if you really want
-        to use this lol
-        :param eta:
-        :param max_width:
-        :param num_offsets:
-        :param num_threads:
-        :return:
-        """
-        if num_threads == 0:
-            num_threads = 1
-        # print("num threads: " + str(num_threads))
-        # print(self.observation_name)
-
-        temp = [max_width * np.sqrt(x) for x in np.linspace(0, 1, num_offsets / 2)]
-        offsets = [-x for x in list(reversed(temp))[:-1]]
-        offsets.extend(temp)
-
-        # print(offsets)
-
-        pool = mp.Pool(processes=num_threads)
-        output = pool.map(partial(crunchy3, sec=self, eta=eta), offsets)
-
-        powers = {}
-        for item in output:
-            powers[item[0]] = item[1]
-
-        ret = sort_dict_by_key(powers)
-        self.offsets = ret[0]
-        self.offset_powers = ret[1]
-        return ret
+        is_dB = True  # indicates power values are log (dB) values
